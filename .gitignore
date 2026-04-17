@@ -37,3 +37,9 @@ Thumbs.db
 .DS_Store
 
 .vercel
+
+# Claude Code
+.claude/
+
+# TypeScript build
+tsconfig.tsbuildinfo
