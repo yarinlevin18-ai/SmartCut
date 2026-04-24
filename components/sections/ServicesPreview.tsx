@@ -1,9 +1,6 @@
-import { getServices } from "@/lib/actions";
+import { STATIC_SERVICES } from "@/lib/services-data";
 import { ServicesPreviewClient } from "./ServicesPreviewClient";
 
-export async function ServicesPreview() {
-  const result = await getServices();
-  const services = result.success && result.data ? result.data : [];
-
-  return <ServicesPreviewClient services={services} />;
+export function ServicesPreview() {
+  return <ServicesPreviewClient services={STATIC_SERVICES} />;
 }
