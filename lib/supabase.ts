@@ -42,6 +42,26 @@ export const createClient = async (): Promise<SupabaseClient> => {
 };
 
 /**
+ * createAnonClient() — Cookie-less anon client for cached public reads.
+ * unstable_cache() forbids dynamic request functions like cookies(), so the
+ * cookie-backed createClient() cannot be used inside a cached wrapper.
+ */
+export const createAnonClient = (): SupabaseClient => {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!url || !key) {
+    throw new Error(
+      "Missing Supabase environment variables. Make sure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY are set in .env.local."
+    );
+  }
+
+  return createSupabaseClient(url, key, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+};
+
+/**
  * createServerAdmin() — For use in server actions with elevated permissions
  * Uses service role key for admin operations (never exposed client-side)
  * Does NOT use cookie middleware (service role is for server-to-server calls)

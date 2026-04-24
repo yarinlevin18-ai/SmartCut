@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath, unstable_cache } from "next/cache";
-import { createClient, createServerAdmin } from "./supabase";
+import { createClient, createAnonClient, createServerAdmin } from "./supabase";
 import type {
   Service,
   GalleryPhoto,
@@ -18,7 +18,7 @@ async function fetchSiteContent(
   key: string
 ): Promise<ServerActionResult<string | null>> {
   try {
-    const supabase = await createClient();
+    const supabase = createAnonClient();
     const { data, error } = await supabase
       .from("site_content")
       .select("value")
@@ -89,7 +89,7 @@ export async function updateSiteContent(
 
 async function fetchServices(): Promise<ServerActionResult<Service[]>> {
   try {
-    const supabase = await createClient();
+    const supabase = createAnonClient();
     const { data, error } = await supabase
       .from("services")
       .select("*")
@@ -231,7 +231,7 @@ export async function deleteService(id: string): Promise<ServerActionResult> {
 
 async function fetchGallery(): Promise<ServerActionResult<GalleryPhoto[]>> {
   try {
-    const supabase = await createClient();
+    const supabase = createAnonClient();
     const { data, error } = await supabase
       .from("gallery")
       .select("*")
