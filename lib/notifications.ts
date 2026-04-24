@@ -1,0 +1,180 @@
+import "server-only";
+import { formatInTimeZone } from "date-fns-tz";
+import { createServerAdmin } from "./supabase";
+import type { NotificationTemplate } from "@/types";
+
+const JERUSALEM_TZ = "Asia/Jerusalem";
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+export type NotificationBookingContext = {
+  booking_id: string;
+  customer_name: string;
+  phone: string; // E.164
+  email: string | null;
+  slot_start: string; // ISO UTC
+  slot_end: string; // ISO UTC
+  service_name: string;
+  duration_minutes: number;
+};
+
+type EnqueueRow = {
+  booking_id: string;
+  channel: "email" | "sms";
+  template: NotificationTemplate;
+  recipient: string;
+  locale: "he";
+  payload: Record<string, unknown>;
+  scheduled_for: string;
+};
+
+function buildPayload(ctx: NotificationBookingContext): Record<string, unknown> {
+  return {
+    customer_name: ctx.customer_name,
+    service_name: ctx.service_name,
+    duration_minutes: ctx.duration_minutes,
+    slot_start_iso: ctx.slot_start,
+    slot_start_local_date: formatInTimeZone(ctx.slot_start, JERUSALEM_TZ, "dd/MM/yyyy"),
+    slot_start_local_time: formatInTimeZone(ctx.slot_start, JERUSALEM_TZ, "HH:mm"),
+    slot_start_local_weekday: formatInTimeZone(ctx.slot_start, JERUSALEM_TZ, "EEEE"),
+  };
+}
+
+function reminderSendAt(slotStartIso: string): string {
+  return new Date(new Date(slotStartIso).getTime() - 24 * 60 * 60 * 1000).toISOString();
+}
+
+/**
+ * Enqueue confirmation (immediate) + reminder (slot_start - 24h) notifications
+ * for a newly created booking. Never throws — failures are logged and swallowed
+ * so booking creation is not blocked by the notifications pipeline.
+ */
+export async function enqueueBookingCreated(
+  ctx: NotificationBookingContext
+): Promise<{ enqueued: number; skipped: string[] }> {
+  const skipped: string[] = [];
+  const rows: EnqueueRow[] = [];
+  const now = new Date().toISOString();
+  const reminderAt = reminderSendAt(ctx.slot_start);
+  const reminderIsFuture = new Date(reminderAt).getTime() > Date.now();
+  const payload = buildPayload(ctx);
+
+  // SMS — recipient is always the phone (validated E.164 upstream)
+  rows.push({
+    booking_id: ctx.booking_id,
+    channel: "sms",
+    template: "booking_confirmed",
+    recipient: ctx.phone,
+    locale: "he",
+    payload,
+    scheduled_for: now,
+  });
+  if (reminderIsFuture) {
+    rows.push({
+      booking_id: ctx.booking_id,
+      channel: "sms",
+      template: "booking_reminder_24h",
+      recipient: ctx.phone,
+      locale: "he",
+      payload,
+      scheduled_for: reminderAt,
+    });
+  } else {
+    skipped.push("sms_reminder:slot_within_24h");
+  }
+
+  // Email — only if customer supplied a valid-looking address
+  if (ctx.email && EMAIL_RE.test(ctx.email)) {
+    rows.push({
+      booking_id: ctx.booking_id,
+      channel: "email",
+      template: "booking_confirmed",
+      recipient: ctx.email,
+      locale: "he",
+      payload,
+      scheduled_for: now,
+    });
+    if (reminderIsFuture) {
+      rows.push({
+        booking_id: ctx.booking_id,
+        channel: "email",
+        template: "booking_reminder_24h",
+        recipient: ctx.email,
+        locale: "he",
+        payload,
+        scheduled_for: reminderAt,
+      });
+    }
+  } else {
+    skipped.push("email:no_address");
+  }
+
+  try {
+    const admin = createServerAdmin();
+    const { error } = await admin.from("notifications").insert(rows);
+    if (error) {
+      console.error("[notifications] enqueue created failed", error.code, error.message);
+      return { enqueued: 0, skipped: [...skipped, `insert_error:${error.code ?? "unknown"}`] };
+    }
+    return { enqueued: rows.length, skipped };
+  } catch (err) {
+    console.error("[notifications] enqueue created threw", err instanceof Error ? err.message : err);
+    return { enqueued: 0, skipped: [...skipped, "enqueue_threw"] };
+  }
+}
+
+/**
+ * On cancellation: enqueue a cancellation notice (immediate) AND mark any
+ * still-queued reminders for this booking as 'skipped' so they don't fire.
+ */
+export async function enqueueBookingCancelled(
+  ctx: NotificationBookingContext
+): Promise<{ enqueued: number; skippedReminders: number }> {
+  const payload = buildPayload(ctx);
+  const now = new Date().toISOString();
+  const rows: EnqueueRow[] = [
+    {
+      booking_id: ctx.booking_id,
+      channel: "sms",
+      template: "booking_cancelled",
+      recipient: ctx.phone,
+      locale: "he",
+      payload,
+      scheduled_for: now,
+    },
+  ];
+  if (ctx.email && EMAIL_RE.test(ctx.email)) {
+    rows.push({
+      booking_id: ctx.booking_id,
+      channel: "email",
+      template: "booking_cancelled",
+      recipient: ctx.email,
+      locale: "he",
+      payload,
+      scheduled_for: now,
+    });
+  }
+
+  try {
+    const admin = createServerAdmin();
+    const [insertRes, skipRes] = await Promise.all([
+      admin.from("notifications").insert(rows),
+      admin
+        .from("notifications")
+        .update({ status: "skipped", error: "booking_cancelled" })
+        .eq("booking_id", ctx.booking_id)
+        .eq("template", "booking_reminder_24h")
+        .eq("status", "queued")
+        .select("id"),
+    ]);
+    if (insertRes.error) {
+      console.error("[notifications] enqueue cancelled failed", insertRes.error.message);
+    }
+    return {
+      enqueued: insertRes.error ? 0 : rows.length,
+      skippedReminders: skipRes.data?.length ?? 0,
+    };
+  } catch (err) {
+    console.error("[notifications] enqueue cancelled threw", err instanceof Error ? err.message : err);
+    return { enqueued: 0, skippedReminders: 0 };
+  }
+}

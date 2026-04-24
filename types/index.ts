@@ -83,3 +83,39 @@ export interface BlockedDate {
   reason: string | null;
   created_at: string;
 }
+
+export type NotificationChannel = "email" | "sms";
+export type NotificationTemplate =
+  | "booking_confirmed"
+  | "booking_cancelled"
+  | "booking_reminder_24h";
+export type NotificationStatus = "queued" | "sent" | "failed" | "skipped";
+export type NotificationLocale = "he" | "en";
+
+export interface Notification {
+  id: string;
+  booking_id: string | null;
+  channel: NotificationChannel;
+  template: NotificationTemplate;
+  recipient: string;
+  locale: NotificationLocale;
+  status: NotificationStatus;
+  attempts: number;
+  provider: string | null;
+  provider_message_id: string | null;
+  error: string | null;
+  payload: Record<string, unknown>;
+  scheduled_for: string;
+  created_at: string;
+  sent_at: string | null;
+  updated_at: string;
+}
+
+export interface NotificationEnqueueInput {
+  booking_id: string;
+  channel: NotificationChannel;
+  template: NotificationTemplate;
+  recipient: string;
+  scheduled_for?: string;
+  payload: Record<string, unknown>;
+}

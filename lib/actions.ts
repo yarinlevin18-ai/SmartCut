@@ -4,6 +4,7 @@ import { revalidatePath, revalidateTag, unstable_cache } from "next/cache";
 import { formatInTimeZone } from "date-fns-tz";
 import { createClient, createAnonClient, createServerAdmin } from "./supabase";
 import { requireAdmin } from "./auth";
+import { enqueueBookingCreated, enqueueBookingCancelled } from "./notifications";
 import type {
   Service,
   GalleryPhoto,
@@ -576,7 +577,7 @@ export async function createBooking(
 
   const { data: service, error: serviceError } = await supabase
     .from("services")
-    .select("duration_minutes")
+    .select("duration_minutes,name")
     .eq("id", input.service_id)
     .single();
 
@@ -587,6 +588,7 @@ export async function createBooking(
   if (typeof duration !== "number" || duration <= 0) {
     return { success: false, error: "Service has no duration" };
   }
+  const serviceName = typeof service?.name === "string" ? service.name : "";
 
   const slotEndDate = new Date(slotStartDate.getTime() + duration * 60_000);
   const slotStartIso = slotStartDate.toISOString();
@@ -634,8 +636,22 @@ export async function createBooking(
     return { success: false, error: error.message };
   }
 
+  const booking = data as Booking;
+
+  // Fire-and-forget: never block booking success on the notifications pipeline.
+  await enqueueBookingCreated({
+    booking_id: booking.id,
+    customer_name: booking.full_name,
+    phone,
+    email: booking.email,
+    slot_start: slotStartIso,
+    slot_end: slotEndIso,
+    service_name: serviceName,
+    duration_minutes: duration,
+  });
+
   revalidatePath("/admin/bookings");
-  return { success: true, data: data as Booking };
+  return { success: true, data: booking };
 }
 
 export async function getBookings(): Promise<ServerActionResult<Booking[]>> {
@@ -663,26 +679,57 @@ export async function getBookings(): Promise<ServerActionResult<Booking[]>> {
   }
 }
 
-export async function deleteBooking(id: string): Promise<ServerActionResult> {
+/**
+ * Soft-cancel a booking. Sets status='cancelled' (which removes it from the
+ * overlap exclusion), enqueues a cancellation notice, and marks any pending
+ * reminder as 'skipped'. Preserves audit trail — use purgeBooking for true delete.
+ */
+export async function cancelBooking(id: string): Promise<ServerActionResult> {
   try {
     await requireAdmin();
+    if (!UUID_RE.test(id)) return { success: false, error: "Invalid booking id" };
     const supabase = await createClient();
-    const { error } = await supabase.from("bookings").delete().eq("id", id);
+
+    const { data, error } = await supabase
+      .from("bookings")
+      .update({ status: "cancelled" })
+      .eq("id", id)
+      .neq("status", "cancelled")
+      .select("id, full_name, phone, email, slot_start, slot_end, service_id, services(name, duration_minutes)")
+      .single();
 
     if (error) throw error;
+    if (!data) return { success: false, error: "Booking not found or already cancelled" };
+
+    const svc = Array.isArray(data.services) ? data.services[0] : data.services;
+    if (data.slot_start && data.slot_end && data.phone) {
+      await enqueueBookingCancelled({
+        booking_id: data.id,
+        customer_name: data.full_name,
+        phone: data.phone,
+        email: data.email ?? null,
+        slot_start: data.slot_start,
+        slot_end: data.slot_end,
+        service_name: (svc?.name as string | undefined) ?? "",
+        duration_minutes: (svc?.duration_minutes as number | undefined) ?? 0,
+      });
+    }
 
     revalidatePath("/admin/bookings");
-    return {
-      success: true,
-    };
+    return { success: true };
   } catch (error) {
     const errorMessage =
-      error instanceof Error ? error.message : "Failed to delete booking";
-    return {
-      success: false,
-      error: errorMessage,
-    };
+      error instanceof Error ? error.message : "Failed to cancel booking";
+    return { success: false, error: errorMessage };
   }
+}
+
+/**
+ * @deprecated use cancelBooking. Kept as an alias so existing callers keep
+ * working during the transition; the action now soft-cancels instead of deleting.
+ */
+export async function deleteBooking(id: string): Promise<ServerActionResult> {
+  return cancelBooking(id);
 }
 
 // ============================================================================
