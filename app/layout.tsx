@@ -119,7 +119,7 @@ export default function RootLayout({
       "סטודיו גברים פרימיום בתל אביב. גילוח קלאסי, עיצוב זקן ושפם, וטיפול שיער.",
     url: "https://www.carmelis-studio.com",
     image: "https://static.wixstatic.com/media/3d7d7e_c3c9c7388d8e45c9aa202d3e9a91c3b4~mv2.png",
-    telephone: "+972-3-9000-000",
+    telephone: "+972-52-455-0069",
     priceRange: "₪₪",
     address: {
       "@type": "PostalAddress",

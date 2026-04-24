@@ -86,7 +86,7 @@ export function GalleryPreviewClient({ photos }: GalleryPreviewClientProps) {
               lineHeight: 1,
             }}
           >
-            העבודות שלנו
+            גלריה
           </h2>
           <div className="flex items-center justify-center gap-3 mt-6">
             <span className="h-px w-10 bg-gold-accent/60" />

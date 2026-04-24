@@ -71,8 +71,8 @@ export default function AccessibilityPage() {
           </a>
           <br />
           <strong>טלפון:</strong>{" "}
-          <a href="tel:+972548029820" dir="ltr">
-            054-802-9820
+          <a href="tel:+972524550069" dir="ltr">
+            052-455-0069
           </a>
         </p>
 

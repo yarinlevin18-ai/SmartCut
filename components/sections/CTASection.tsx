@@ -66,51 +66,22 @@ export function CTASection() {
           <span className="h-px w-14 bg-gold-accent/60" />
         </div>
 
-        <p
-          className="font-body text-white/70 max-w-xl mx-auto mb-12"
-          style={{
-            fontSize: "clamp(15px, 1.3vw, 18px)",
-            fontWeight: 300,
-            lineHeight: 1.85,
-          }}
-        >
-          מקום מוגבל בכל שבוע. ידיים מקצועיות. חוויה שתרצו לחזור אליה.
-        </p>
-
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4">
-          <Link href="/booking">
-            <button
-              className="font-label uppercase transition-all duration-200 hover:bg-gold-light"
-              style={{
-                border: "1px solid #c9a84c",
-                color: "#000",
-                background: "#c9a84c",
-                fontSize: 12,
-                fontWeight: 700,
-                padding: "16px 52px",
-                borderRadius: 0,
-                letterSpacing: "0.28em",
-              }}
-            >
-              הזמינו תור
-            </button>
-          </Link>
-          <Link href="/services">
-            <button
-              className="font-label uppercase transition-all duration-200 hover:bg-white/10"
-              style={{
-                border: "1px solid rgba(255,255,255,0.35)",
-                color: "rgba(255,255,255,0.9)",
-                fontSize: 12,
-                fontWeight: 600,
-                padding: "16px 52px",
-                borderRadius: 0,
-                background: "transparent",
-                letterSpacing: "0.24em",
-              }}
-            >
-              השירותים שלנו
-            </button>
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 mt-12">
+          <Link
+            href="/booking"
+            className="font-label uppercase inline-block transition-all duration-200 hover:bg-gold-light"
+            style={{
+              border: "1px solid #c9a84c",
+              color: "#000",
+              background: "#c9a84c",
+              fontSize: 12,
+              fontWeight: 700,
+              padding: "16px 52px",
+              borderRadius: 0,
+              letterSpacing: "0.28em",
+            }}
+          >
+            הזמינו תור
           </Link>
         </div>
       </motion.div>

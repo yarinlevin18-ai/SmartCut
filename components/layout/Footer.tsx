@@ -12,7 +12,7 @@ export function Footer() {
     process.env.NEXT_PUBLIC_WIX_BOOKING_URL ??
     "https://www.carmelis-studio.com/book-online";
 
-  const [phone, setPhone] = useState("");
+  const [phone, setPhone] = useState("052-455-0069");
 
   useEffect(() => {
     getSiteContent("phone").then((r) => {
@@ -47,8 +47,6 @@ export function Footer() {
               className="font-body text-white/50 mt-5 leading-relaxed"
               style={{ fontSize: 13, fontWeight: 300, lineHeight: 1.8 }}
             >
-              אמנות הגילוח הגברי.
-              <br />
               דיוק חסר פשרות.
             </p>
           </div>

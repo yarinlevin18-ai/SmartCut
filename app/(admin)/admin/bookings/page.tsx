@@ -1,35 +1,19 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { createClientBrowser } from "@/lib/supabase-browser";
 import { getBookings, deleteBooking } from "@/lib/actions";
 import type { Booking } from "@/types";
 
 export default function BookingsPage() {
-  const router = useRouter();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
 
   useEffect(() => {
-    const checkAuth = async (): Promise<void> => {
-      const supabase = createClientBrowser();
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
-      if (!user) {
-        router.push("/admin/login");
-        return;
-      }
-
-      await loadBookings();
-    };
-    checkAuth();
-  }, [router]);
+    loadBookings();
+  }, []);
 
   const loadBookings = async (): Promise<void> => {
     const result = await getBookings();

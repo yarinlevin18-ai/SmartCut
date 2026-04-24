@@ -25,7 +25,7 @@ INSERT INTO site_content (key, value) VALUES
   ),
   (
     'phone',
-    '+972-3-XXX-XXXX'
+    '052-455-0069'
   ),
   (
     'hours',

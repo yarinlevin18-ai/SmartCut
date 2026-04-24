@@ -8,6 +8,7 @@ import { createClientBrowser } from "@/lib/supabase-browser";
 const NAV_ITEMS = [
   { href: "/admin", label: "סקירה", en: "Dashboard" },
   { href: "/admin/services", label: "שירותים", en: "Services" },
+  { href: "/admin/content", label: "תוכן אתר", en: "Content" },
   { href: "/admin/gallery", label: "גלריה", en: "Gallery" },
   { href: "/admin/bookings", label: "תורים", en: "Bookings" },
 ];

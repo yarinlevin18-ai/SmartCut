@@ -44,6 +44,7 @@ export interface BookingFormData {
   full_name: string;
   phone: string;
   service_id: string;
+  preferred_date: string;
   preferred_time: string;
 }
 

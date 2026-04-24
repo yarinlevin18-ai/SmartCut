@@ -1,15 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { createClientBrowser } from "@/lib/supabase-browser";
 import { deleteService, getServices } from "@/lib/actions";
 import type { Service } from "@/types";
 import { ServiceModal } from "./ServiceModal";
 
 export default function ServicesPage() {
-  const router = useRouter();
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -17,21 +14,8 @@ export default function ServicesPage() {
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
 
   useEffect(() => {
-    const checkAuth = async (): Promise<void> => {
-      const supabase = createClientBrowser();
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
-      if (!user) {
-        router.push("/admin/login");
-        return;
-      }
-
-      await loadServices();
-    };
-    checkAuth();
-  }, [router]);
+    loadServices();
+  }, []);
 
   const loadServices = async (): Promise<void> => {
     const result = await getServices();

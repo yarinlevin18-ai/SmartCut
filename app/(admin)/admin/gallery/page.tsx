@@ -1,10 +1,8 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
-import { createClientBrowser } from "@/lib/supabase-browser";
 import {
   deleteGalleryItem,
   updateGalleryCaption,
@@ -17,7 +15,6 @@ import type { GalleryPhoto } from "@/types";
 const MAX_FILE_SIZE = 50 * 1024 * 1024;
 
 export default function GalleryPage() {
-  const router = useRouter();
   const [photos, setPhotos] = useState<GalleryPhoto[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
@@ -26,21 +23,8 @@ export default function GalleryPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    const checkAuth = async (): Promise<void> => {
-      const supabase = createClientBrowser();
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
-      if (!user) {
-        router.push("/admin/login");
-        return;
-      }
-
-      await loadPhotos();
-    };
-    checkAuth();
-  }, [router]);
+    loadPhotos();
+  }, []);
 
   const loadPhotos = async (): Promise<void> => {
     const result = await getGallery();

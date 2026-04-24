@@ -119,39 +119,21 @@ export function Hero() {
           transition={{ duration: 0.8, ease: EASE, delay: 1.2 }}
           className="flex flex-col sm:flex-row items-center gap-3 sm:gap-4"
         >
-          <Link href="/booking">
-            <button
-              className="font-label uppercase transition-all duration-200 hover:bg-gold-accent hover:text-black"
-              style={{
-                border: "1px solid #c9a84c",
-                color: "#c9a84c",
-                fontSize: 12,
-                fontWeight: 600,
-                padding: "14px 44px",
-                borderRadius: 0,
-                background: "transparent",
-                letterSpacing: "0.24em",
-              }}
-            >
-              הזמינו תור
-            </button>
-          </Link>
-          <Link href="/services">
-            <button
-              className="font-label uppercase transition-all duration-200 hover:bg-white/10"
-              style={{
-                border: "1px solid rgba(255,255,255,0.35)",
-                color: "rgba(255,255,255,0.9)",
-                fontSize: 12,
-                fontWeight: 600,
-                padding: "14px 44px",
-                borderRadius: 0,
-                background: "transparent",
-                letterSpacing: "0.24em",
-              }}
-            >
-              השירותים שלנו
-            </button>
+          <Link
+            href="/booking"
+            className="font-label uppercase inline-block transition-all duration-200 hover:bg-gold-accent hover:text-black"
+            style={{
+              border: "1px solid #c9a84c",
+              color: "#c9a84c",
+              fontSize: 12,
+              fontWeight: 600,
+              padding: "14px 44px",
+              borderRadius: 0,
+              background: "transparent",
+              letterSpacing: "0.24em",
+            }}
+          >
+            הזמינו תור
           </Link>
         </motion.div>
       </div>

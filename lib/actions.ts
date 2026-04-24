@@ -1,7 +1,8 @@
 "use server";
 
-import { revalidatePath, unstable_cache } from "next/cache";
+import { revalidatePath, revalidateTag, unstable_cache } from "next/cache";
 import { createClient, createAnonClient, createServerAdmin } from "./supabase";
+import { requireAdmin } from "./auth";
 import type {
   Service,
   GalleryPhoto,
@@ -55,6 +56,7 @@ export async function updateSiteContent(
   value: string
 ): Promise<ServerActionResult> {
   try {
+    await requireAdmin();
     const supabase = await createClient();
     const { error } = await supabase.from("site_content").upsert(
       {
@@ -67,6 +69,7 @@ export async function updateSiteContent(
 
     if (error) throw error;
 
+    revalidateTag("site_content");
     revalidatePath("/");
     return {
       success: true,
@@ -150,6 +153,7 @@ export async function createService(
   service: Omit<Service, "id" | "created_at">
 ): Promise<ServerActionResult<Service>> {
   try {
+    await requireAdmin();
     const supabase = await createClient();
     const { data, error } = await supabase
       .from("services")
@@ -159,6 +163,7 @@ export async function createService(
 
     if (error) throw error;
 
+    revalidateTag("services");
     revalidatePath("/");
     revalidatePath("/services");
     return {
@@ -180,6 +185,7 @@ export async function updateService(
   service: Partial<Omit<Service, "id" | "created_at">>
 ): Promise<ServerActionResult> {
   try {
+    await requireAdmin();
     const supabase = await createClient();
     const { error } = await supabase
       .from("services")
@@ -188,6 +194,7 @@ export async function updateService(
 
     if (error) throw error;
 
+    revalidateTag("services");
     revalidatePath("/");
     revalidatePath("/services");
     return {
@@ -205,11 +212,13 @@ export async function updateService(
 
 export async function deleteService(id: string): Promise<ServerActionResult> {
   try {
+    await requireAdmin();
     const supabase = await createClient();
     const { error } = await supabase.from("services").delete().eq("id", id);
 
     if (error) throw error;
 
+    revalidateTag("services");
     revalidatePath("/");
     revalidatePath("/services");
     return {
@@ -280,6 +289,7 @@ export async function addGalleryItem(
   caption?: string
 ): Promise<ServerActionResult<GalleryPhoto>> {
   try {
+    await requireAdmin();
     console.log(`[Gallery] Adding gallery item: ${storagePath}`);
 
     // Use service role for database operations (bypasses RLS that requires auth)
@@ -328,6 +338,7 @@ export async function addGalleryItem(
         .getPublicUrl(storagePath).data.publicUrl,
     };
 
+    revalidateTag("gallery");
     revalidatePath("/");
     revalidatePath("/gallery");
 
@@ -351,6 +362,7 @@ export async function deleteGalleryItem(
   id: string
 ): Promise<ServerActionResult> {
   try {
+    await requireAdmin();
     const supabase = await createClient();
 
     // Fetch the item to get storage_path
@@ -377,6 +389,7 @@ export async function deleteGalleryItem(
 
     if (deleteError) throw deleteError;
 
+    revalidateTag("gallery");
     revalidatePath("/");
     revalidatePath("/gallery");
     return {
@@ -399,6 +412,7 @@ export async function updateGalleryCaption(
   caption: string
 ): Promise<ServerActionResult> {
   try {
+    await requireAdmin();
     const supabase = await createClient();
     const { error } = await supabase
       .from("gallery")
@@ -407,6 +421,7 @@ export async function updateGalleryCaption(
 
     if (error) throw error;
 
+    revalidateTag("gallery");
     revalidatePath("/");
     revalidatePath("/gallery");
     return {
@@ -428,6 +443,7 @@ export async function uploadGalleryPhoto(
   contentType: string
 ): Promise<ServerActionResult<{ storagePath: string; publicUrl: string }>> {
   try {
+    await requireAdmin();
     // Use service role key for storage operations (requires elevated permissions)
     const supabase = createServerAdmin();
     const filename = `${Date.now()}-${fileName}`;
@@ -491,6 +507,7 @@ export async function createBooking(
         phone: booking.phone,
         email: "",
         service_id: booking.service_id,
+        preferred_date: booking.preferred_date,
         preferred_time: booking.preferred_time,
         created_at: new Date().toISOString(),
       }])
@@ -500,6 +517,7 @@ export async function createBooking(
     if (error) throw error;
 
     revalidatePath("/");
+    revalidatePath("/admin/bookings");
     return {
       success: true,
       data: data!,
@@ -516,6 +534,7 @@ export async function createBooking(
 
 export async function getBookings(): Promise<ServerActionResult<Booking[]>> {
   try {
+    await requireAdmin();
     const supabase = await createClient();
     const { data, error } = await supabase
       .from("bookings")
@@ -540,6 +559,7 @@ export async function getBookings(): Promise<ServerActionResult<Booking[]>> {
 
 export async function deleteBooking(id: string): Promise<ServerActionResult> {
   try {
+    await requireAdmin();
     const supabase = await createClient();
     const { error } = await supabase.from("bookings").delete().eq("id", id);
 
