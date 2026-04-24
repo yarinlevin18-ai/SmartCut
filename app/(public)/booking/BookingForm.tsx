@@ -1,28 +1,42 @@
 "use client";
 
-import { useEffect, useState, useRef, useMemo } from "react";
-import { useForm, useWatch } from "react-hook-form";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
+import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { motion } from "framer-motion";
+import { DayPicker } from "react-day-picker";
+import "react-day-picker/style.css";
+import { he } from "date-fns/locale/he";
+import { formatInTimeZone } from "date-fns-tz";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Modal } from "@/components/ui/Modal";
-import { createBooking } from "@/lib/actions";
+import { getAvailableSlots, createBooking } from "@/lib/actions";
 import type { Service } from "@/types";
+
+const JERUSALEM_TZ = "Asia/Jerusalem";
 
 interface BookingFormProps {
   services: Service[];
   preselectedServiceId?: string | null;
 }
 
-function todayIso(): string {
-  const d = new Date();
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const dd = String(d.getDate()).padStart(2, "0");
-  return `${yyyy}-${mm}-${dd}`;
-}
+const bookingSchema = z.object({
+  full_name: z
+    .string({ required_error: "שדה חובה" })
+    .trim()
+    .min(2, "שם חייב לכלול לפחות 2 תווים"),
+  phone: z
+    .string({ required_error: "שדה חובה" })
+    .trim()
+    .min(9, "מספר הטלפון לא תקין"),
+  service_id: z.string().uuid("בחירת שירות חובה"),
+  slot_start: z.string().min(1, "בחירת זמן חובה"),
+  notes: z.string().optional(),
+});
+
+type BookingFormInputs = z.infer<typeof bookingSchema>;
 
 export function BookingForm({
   services,
@@ -33,38 +47,28 @@ export function BookingForm({
   const [successModal, setSuccessModal] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  const today = useMemo(() => todayIso(), []);
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
+  const [slots, setSlots] = useState<string[]>([]);
+  const [slotsLoading, setSlotsLoading] = useState(false);
+  const [slotsError, setSlotsError] = useState<string | null>(null);
 
-  const bookingSchema = useMemo(
-    () =>
-      z.object({
-        full_name: z
-          .string({ required_error: "שדה חובה" })
-          .trim()
-          .min(2, "שם חייב לכלול לפחות 2 תווים"),
-        phone: z
-          .string({ required_error: "שדה חובה" })
-          .trim()
-          .min(9, "מספר הטלפון לא תקין")
-          .regex(/^[0-9+\-\s()]+$/, "מספר הטלפון לא תקין"),
-        service_id: z
-          .string({ required_error: "בחירת שירות חובה" })
-          .min(1, "בחירת שירות חובה"),
-        preferred_date: z
-          .string({ required_error: "תאריך חובה" })
-          .regex(/^\d{4}-\d{2}-\d{2}$/, "תאריך לא תקין")
-          .refine((value) => value >= today, {
-            message: "לא ניתן לבחור תאריך שעבר",
-          }),
-        preferred_time: z.preprocess(
-          (v) => (v == null ? "" : v),
-          z.string().min(1, "בחירת שעה חובה"),
-        ),
-      }),
-    [today],
-  );
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+    reset,
+    setValue,
+    watch,
+  } = useForm<BookingFormInputs>({
+    resolver: zodResolver(bookingSchema),
+    defaultValues: {
+      service_id: preselectedServiceId ?? "",
+      slot_start: "",
+    },
+  });
 
-  type BookingFormInputs = z.infer<typeof bookingSchema>;
+  const serviceId = watch("service_id");
+  const slotStart = watch("slot_start");
 
   const handleInputFocus = (
     e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>,
@@ -74,25 +78,60 @@ export function BookingForm({
     }, 100);
   };
 
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-    reset,
-    setValue,
-    control,
-  } = useForm<BookingFormInputs>({
-    resolver: zodResolver(bookingSchema),
-  });
-
-  const selectedTime = useWatch({ control, name: "preferred_time" });
-  const [selectedDay, setSelectedDay] = useState<string | null>(null);
-
+  // Sync preselected service id once on mount.
   useEffect(() => {
     if (preselectedServiceId) {
       setValue("service_id", preselectedServiceId);
     }
   }, [preselectedServiceId, setValue]);
+
+  // Key derived from service + date for stale-request guarding.
+  const refetchKey = useMemo(() => {
+    if (!serviceId || !selectedDate) return null;
+    const dateStr = formatInTimeZone(selectedDate, JERUSALEM_TZ, "yyyy-MM-dd");
+    return `${serviceId}|${dateStr}`;
+  }, [serviceId, selectedDate]);
+
+  const fetchSlots = useCallback(
+    async (svcId: string, date: Date, signal: { cancelled: boolean }) => {
+      setSlotsLoading(true);
+      setSlotsError(null);
+      const dateStr = formatInTimeZone(date, JERUSALEM_TZ, "yyyy-MM-dd");
+      const result = await getAvailableSlots(svcId, dateStr);
+      if (signal.cancelled) return;
+      if (!result.success) {
+        setSlots([]);
+        setSlotsError(result.error || "לא הצלחנו לטעון משבצות זמינות");
+      } else {
+        setSlots(result.data ?? []);
+      }
+      setSlotsLoading(false);
+    },
+    [],
+  );
+
+  useEffect(() => {
+    setValue("slot_start", "");
+    if (!serviceId || !selectedDate) {
+      setSlots([]);
+      setSlotsError(null);
+      setSlotsLoading(false);
+      return;
+    }
+    const signal = { cancelled: false };
+    fetchSlots(serviceId, selectedDate, signal);
+    return () => {
+      signal.cancelled = true;
+    };
+    // refetchKey already captures both serviceId and selectedDate.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [refetchKey, fetchSlots, setValue]);
+
+  const refetchSlots = useCallback(() => {
+    if (!serviceId || !selectedDate) return;
+    const signal = { cancelled: false };
+    fetchSlots(serviceId, selectedDate, signal);
+  }, [serviceId, selectedDate, fetchSlots]);
 
   const onSubmit = async (data: BookingFormInputs): Promise<void> => {
     setIsSubmitting(true);
@@ -102,24 +141,38 @@ export function BookingForm({
         full_name: data.full_name,
         phone: data.phone,
         service_id: data.service_id,
-        preferred_date: data.preferred_date,
-        preferred_time: data.preferred_time,
+        slot_start: data.slot_start,
+        notes: data.notes,
       });
 
       if (!result.success) {
-        setSubmitError(result.error || "משהו השתבש. נסו שוב.");
+        const err = result.error || "";
+        if (err === "SLOT_TAKEN") {
+          setSubmitError("המשבצת נתפסה, בחר זמן אחר");
+          setValue("slot_start", "");
+          refetchSlots();
+        } else if (err === "SLOT_IN_PAST") {
+          setSubmitError("הזמן שנבחר עבר, בחר זמן אחר");
+          setValue("slot_start", "");
+          refetchSlots();
+        } else if (err === "Invalid phone") {
+          setSubmitError("מספר טלפון לא תקין");
+        } else {
+          setSubmitError(err || "משהו השתבש. נסו שוב.");
+        }
         return;
       }
 
       setSuccessModal(true);
-      reset();
-      setSelectedDay(null);
-      setTimeout(() => {
-        const wixUrl =
-          process.env.NEXT_PUBLIC_WIX_BOOKING_URL ||
-          "https://www.carmelis-studio.com/book-online";
-        window.open(wixUrl, "_blank");
-      }, 1500);
+      reset({
+        service_id: preselectedServiceId ?? "",
+        slot_start: "",
+        full_name: "",
+        phone: "",
+        notes: "",
+      });
+      setSelectedDate(undefined);
+      setSlots([]);
     } catch {
       setSubmitError("משהו השתבש. נסו שוב.");
     } finally {
@@ -128,10 +181,52 @@ export function BookingForm({
   };
 
   const hasServices = services.length > 0;
+  const showSlotsPanel = Boolean(serviceId && selectedDate);
 
   return (
     <>
       <main className="min-h-screen bg-dark py-20" suppressHydrationWarning>
+        {/* DayPicker v9 dark + RTL theming */}
+        <style>{`
+          .booking-rdp .rdp-root {
+            --rdp-accent-color: #c9a84c;
+            --rdp-accent-background-color: transparent;
+            --rdp-day-height: 2.5rem;
+            --rdp-day-width: 2.5rem;
+            color: white;
+          }
+          .booking-rdp .rdp-month_caption,
+          .booking-rdp .rdp-caption_label,
+          .booking-rdp .rdp-weekday,
+          .booking-rdp .rdp-head_cell,
+          .booking-rdp .rdp-nav_button,
+          .booking-rdp .rdp-button_previous,
+          .booking-rdp .rdp-button_next {
+            color: white;
+          }
+          .booking-rdp .rdp-day_button {
+            color: white;
+          }
+          .booking-rdp .rdp-day_button:hover:not([disabled]) {
+            background-color: rgba(201, 168, 76, 0.15);
+          }
+          .booking-rdp .rdp-selected .rdp-day_button,
+          .booking-rdp .rdp-day_selected .rdp-day_button {
+            background-color: #c9a84c !important;
+            color: #0d0d0d !important;
+          }
+          .booking-rdp .rdp-disabled {
+            opacity: 0.25;
+          }
+          .booking-rdp .rdp-today:not(.rdp-selected) .rdp-day_button {
+            color: #e2c97e;
+            font-weight: 700;
+          }
+          .booking-rdp .rdp-chevron {
+            fill: white;
+          }
+        `}</style>
+
         <div className="max-w-2xl mx-auto px-4">
           <motion.div
             initial={{ opacity: 0, y: 24 }}
@@ -200,7 +295,6 @@ export function BookingForm({
                     {...register("service_id")}
                     dir="auto"
                     aria-required="true"
-                    defaultValue={preselectedServiceId ?? ""}
                     className="w-full px-4 py-4 bg-[#141417] border border-white/10 rounded text-white focus:outline-none focus:border-gold-accent/50 focus:ring-1 focus:ring-gold-accent/30 transition-colors"
                   >
                     <option value="">— בחרו שירות —</option>
@@ -223,7 +317,7 @@ export function BookingForm({
                 )}
               </motion.div>
 
-              {/* Preferred Date */}
+              {/* Calendar */}
               <motion.div
                 initial={{ opacity: 0, y: 24 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -232,106 +326,106 @@ export function BookingForm({
                 <label className="block text-sm font-medium text-gray-300 mb-2">
                   תאריך *
                 </label>
-                <input
-                  type="date"
-                  min={today}
-                  aria-required="true"
-                  {...register("preferred_date")}
-                  dir="auto"
-                  onFocus={handleInputFocus}
-                  className="w-full px-4 py-4 bg-[#141417] border border-white/10 rounded text-white focus:outline-none focus:border-gold-accent/50 focus:ring-1 focus:ring-gold-accent/30 transition-colors"
-                />
-                {errors.preferred_date?.message && (
-                  <p className="text-red-400 text-sm mt-2">
-                    {errors.preferred_date.message}
-                  </p>
-                )}
+                <div className="booking-rdp bg-[#141417] border border-white/10 rounded p-3 flex justify-center">
+                  <DayPicker
+                    mode="single"
+                    selected={selectedDate}
+                    onSelect={setSelectedDate}
+                    dir="rtl"
+                    locale={he}
+                    disabled={[{ before: new Date() }, { dayOfWeek: [6] }]}
+                    weekStartsOn={0}
+                  />
+                </div>
               </motion.div>
 
-              {/* Time Slots Selection */}
-              <motion.div
-                initial={{ opacity: 0, y: 24 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6, delay: 0.25 }}
-              >
-                <label className="block text-sm font-medium text-gray-300 mb-4">
-                  בחירת שעה *
-                </label>
-                <div className="space-y-3">
-                  {/* Days */}
-                  <div className="grid grid-cols-6 gap-2 mb-4">
-                    {["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי"].map(
-                      (day) => {
-                        const isActive = selectedDay === day;
-                        return (
-                          <button
-                            key={day}
-                            type="button"
-                            onClick={() => setSelectedDay(day)}
-                            aria-pressed={isActive}
-                            className={`px-3 py-2 text-sm font-medium rounded transition-colors ${
-                              isActive
-                                ? "bg-gold-accent text-black border border-gold-accent"
-                                : "text-gray-300 bg-[#141417] border border-white/10 hover:border-gold-accent/50"
-                            }`}
-                          >
-                            {day}
-                          </button>
-                        );
-                      },
-                    )}
-                  </div>
-
-                  {/* Time Slots Grid */}
+              {/* Slots */}
+              {showSlotsPanel && (
+                <motion.div
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.4 }}
+                >
+                  <label className="block text-sm font-medium text-gray-300 mb-4">
+                    בחירת שעה *
+                  </label>
                   <div className="bg-[#141417] border border-white/10 rounded p-4">
-                    <div className="grid grid-cols-3 gap-2">
-                      {[
-                        "09:00",
-                        "10:00",
-                        "11:00",
-                        "14:00",
-                        "15:00",
-                        "16:00",
-                        "17:00",
-                        "18:00",
-                        "19:00",
-                      ].map((time) => {
-                        const isActive = selectedTime === time;
-                        return (
-                          <label
-                            key={time}
-                            className="flex items-center cursor-pointer"
-                          >
-                            <input
-                              type="radio"
-                              {...register("preferred_time")}
-                              value={time}
-                              className="sr-only"
-                            />
-                            <span
-                              className={`flex-1 px-3 py-2 text-sm text-center rounded border transition-colors ${
+                    {slotsLoading ? (
+                      <div className="text-center text-gray-400 py-6 text-sm">
+                        טוען...
+                      </div>
+                    ) : slotsError ? (
+                      <div className="text-center text-red-400 py-6 text-sm">
+                        {slotsError}
+                      </div>
+                    ) : slots.length === 0 ? (
+                      <div className="text-center text-gray-400 py-6 text-sm">
+                        אין משבצות זמינות ביום זה — נסו תאריך אחר.
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                        {slots.map((iso) => {
+                          const label = formatInTimeZone(
+                            iso,
+                            JERUSALEM_TZ,
+                            "HH:mm",
+                          );
+                          const isActive = slotStart === iso;
+                          return (
+                            <button
+                              key={iso}
+                              type="button"
+                              onClick={() =>
+                                setValue("slot_start", iso, {
+                                  shouldValidate: true,
+                                })
+                              }
+                              aria-pressed={isActive}
+                              className={`px-3 py-2 text-sm text-center rounded border transition-colors ${
                                 isActive
                                   ? "bg-gold-accent text-black border-gold-accent"
                                   : "text-gray-300 bg-dark border-white/10 hover:border-gold-accent/50 hover:text-gold-accent"
                               }`}
                             >
-                              {time}
-                            </span>
-                          </label>
-                        );
-                      })}
-                    </div>
+                              {label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
-                  {errors.preferred_time?.message && (
-                    <p className="text-red-400 text-sm">
-                      {errors.preferred_time.message}
+                  {errors.slot_start?.message && (
+                    <p className="text-red-400 text-sm mt-2">
+                      {errors.slot_start.message}
                     </p>
                   )}
-                </div>
+                </motion.div>
+              )}
+
+              {/* Notes */}
+              <motion.div
+                initial={{ opacity: 0, y: 24 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6, delay: 0.3 }}
+              >
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  הערות (לא חובה)
+                </label>
+                <textarea
+                  {...register("notes")}
+                  dir="auto"
+                  rows={3}
+                  onFocus={handleInputFocus}
+                  className="w-full px-4 py-4 bg-[#141417] border border-white/10 rounded text-white placeholder-gray-500 focus:outline-none focus:border-gold-accent/50 focus:ring-1 focus:ring-gold-accent/30 transition-colors resize-y"
+                  placeholder="משהו שכדאי שנדע מראש?"
+                />
               </motion.div>
 
               {submitError && (
-                <div className="bg-red-500/10 border border-red-500/20 rounded px-4 py-3 text-red-400 text-sm">
+                <div
+                  role="alert"
+                  className="bg-red-500/10 border border-red-500/20 rounded px-4 py-3 text-red-400 text-sm"
+                >
                   {submitError}
                 </div>
               )}
@@ -363,21 +457,7 @@ export function BookingForm({
         title="הצלחנו!"
       >
         <div className="text-center">
-          <p className="text-gray-300 mb-4">
-            הפרטים נשמרו. עוברים לדף ההזמנה עכשיו...
-          </p>
-          <p className="text-sm text-gray-500">אם הדף לא נפתח — לחצו כאן</p>
-          <Button
-            onClick={() => {
-              const wixUrl =
-                process.env.NEXT_PUBLIC_WIX_BOOKING_URL ||
-                "https://www.carmelis-studio.com/book-online";
-              window.open(wixUrl, "_blank");
-            }}
-            className="mt-4 w-full"
-          >
-            העבירו אותי
-          </Button>
+          <p className="text-gray-300">נרשמת בהצלחה. ניצור קשר בקרוב.</p>
         </div>
       </Modal>
     </>

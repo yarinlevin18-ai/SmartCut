@@ -1,15 +1,43 @@
 "use server";
 
 import { revalidatePath, revalidateTag, unstable_cache } from "next/cache";
+import { formatInTimeZone } from "date-fns-tz";
 import { createClient, createAnonClient, createServerAdmin } from "./supabase";
 import { requireAdmin } from "./auth";
 import type {
   Service,
   GalleryPhoto,
   Booking,
-  BookingFormData,
+  BookingInput,
   ServerActionResult,
+  AvailabilityConfigRow,
+  BlockedDate,
 } from "@/types";
+
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const JERUSALEM_TZ = "Asia/Jerusalem";
+
+// Israeli mobile prefixes are 05X — landlines (02/03/04/08/09) are not bookable
+// targets here, so we deliberately reject them.
+function normalizeIsraeliPhone(raw: string): string | null {
+  if (!raw) return null;
+  const cleaned = raw.replace(/[\s-]/g, "");
+  let digits: string;
+  if (cleaned.startsWith("+972")) {
+    digits = cleaned.slice(4);
+  } else if (cleaned.startsWith("972")) {
+    digits = cleaned.slice(3);
+  } else if (cleaned.startsWith("0")) {
+    digits = cleaned.slice(1);
+  } else {
+    return null;
+  }
+  if (!/^\d{9}$/.test(digits)) return null;
+  if (!digits.startsWith("5")) return null;
+  return `+972${digits}`;
+}
 
 // ============================================================================
 // SITE CONTENT
@@ -495,41 +523,119 @@ export async function uploadGalleryPhoto(
 // BOOKINGS
 // ============================================================================
 
-export async function createBooking(
-  booking: BookingFormData
-): Promise<ServerActionResult<Booking>> {
-  try {
-    const supabase = await createClient();
-    const { data, error } = await supabase
-      .from("bookings")
-      .insert([{
-        full_name: booking.full_name,
-        phone: booking.phone,
-        email: "",
-        service_id: booking.service_id,
-        preferred_date: booking.preferred_date,
-        preferred_time: booking.preferred_time,
-        created_at: new Date().toISOString(),
-      }])
-      .select()
-      .single();
-
-    if (error) throw error;
-
-    revalidatePath("/");
-    revalidatePath("/admin/bookings");
-    return {
-      success: true,
-      data: data!,
-    };
-  } catch (error) {
-    const errorMessage =
-      error instanceof Error ? error.message : "Failed to create booking";
-    return {
-      success: false,
-      error: errorMessage,
-    };
+export async function getAvailableSlots(
+  serviceId: string,
+  date: string
+): Promise<ServerActionResult<string[]>> {
+  if (!UUID_RE.test(serviceId)) {
+    return { success: false, error: "Invalid service id" };
   }
+  if (!DATE_RE.test(date)) {
+    return { success: false, error: "Invalid date format" };
+  }
+
+  const supabase = createAnonClient();
+  const { data, error } = await supabase.rpc("get_available_slots", {
+    p_service_id: serviceId,
+    p_date: date,
+  });
+
+  if (error) {
+    return { success: false, error: error.message };
+  }
+
+  const rows = (data ?? []) as Array<{ slot_start: string } | string>;
+  const slots = rows.map((r) =>
+    typeof r === "string" ? r : r.slot_start
+  );
+  return { success: true, data: slots };
+}
+
+export async function createBooking(
+  input: BookingInput
+): Promise<ServerActionResult<Booking>> {
+  if (!input.full_name || !input.full_name.trim()) {
+    return { success: false, error: "Missing full name" };
+  }
+  if (!input.phone) {
+    return { success: false, error: "Missing phone" };
+  }
+  if (!UUID_RE.test(input.service_id)) {
+    return { success: false, error: "Invalid service id" };
+  }
+  const slotStartDate = new Date(input.slot_start);
+  if (Number.isNaN(slotStartDate.getTime())) {
+    return { success: false, error: "Invalid slot_start" };
+  }
+  const phone = normalizeIsraeliPhone(input.phone);
+  if (!phone) {
+    return { success: false, error: "Invalid phone" };
+  }
+
+  const supabase = await createClient();
+
+  const { data: service, error: serviceError } = await supabase
+    .from("services")
+    .select("duration_minutes")
+    .eq("id", input.service_id)
+    .single();
+
+  if (serviceError) {
+    return { success: false, error: serviceError.message };
+  }
+  const duration = service?.duration_minutes;
+  if (typeof duration !== "number" || duration <= 0) {
+    return { success: false, error: "Service has no duration" };
+  }
+
+  const slotEndDate = new Date(slotStartDate.getTime() + duration * 60_000);
+  const slotStartIso = slotStartDate.toISOString();
+  const slotEndIso = slotEndDate.toISOString();
+
+  const preferred_date = formatInTimeZone(
+    slotStartDate,
+    JERUSALEM_TZ,
+    "yyyy-MM-dd"
+  );
+  const preferred_time = formatInTimeZone(
+    slotStartDate,
+    JERUSALEM_TZ,
+    "HH:mm"
+  );
+
+  const { data, error } = await supabase
+    .from("bookings")
+    .insert([
+      {
+        full_name: input.full_name.trim(),
+        phone,
+        email: input.email && input.email.trim() ? input.email.trim() : null,
+        service_id: input.service_id,
+        slot_start: slotStartIso,
+        slot_end: slotEndIso,
+        status: "confirmed",
+        barber_id: null,
+        preferred_date,
+        preferred_time,
+        notes: input.notes ?? null,
+        created_at: new Date().toISOString(),
+      },
+    ])
+    .select()
+    .single();
+
+  if (error) {
+    if (error.code === "23P01") {
+      return { success: false, error: "SLOT_TAKEN" };
+    }
+    if (error.code === "23514") {
+      return { success: false, error: "SLOT_IN_PAST" };
+    }
+    return { success: false, error: error.message };
+  }
+
+  revalidatePath("/admin/bookings");
+  return { success: true, data: data as Booking };
 }
 
 export async function getBookings(): Promise<ServerActionResult<Booking[]>> {
@@ -576,5 +682,268 @@ export async function deleteBooking(id: string): Promise<ServerActionResult> {
       success: false,
       error: errorMessage,
     };
+  }
+}
+
+// ============================================================================
+// AVAILABILITY (weekly schedule + blocked dates)
+// ============================================================================
+
+const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+function normalizeTime(value: string): string {
+  // Accept "HH:MM" or "HH:MM:SS" from Postgres time columns and normalize to "HH:MM".
+  const match = /^(\d{2}):(\d{2})/.exec(value);
+  return match ? `${match[1]}:${match[2]}` : value;
+}
+
+function timeToMinutes(value: string): number {
+  const [h, m] = value.split(":").map(Number);
+  return h * 60 + m;
+}
+
+export async function getAvailabilityConfig(): Promise<
+  ServerActionResult<AvailabilityConfigRow[]>
+> {
+  try {
+    const supabase = createAnonClient();
+    const { data, error } = await supabase
+      .from("availability_config")
+      .select("*")
+      .is("barber_id", null)
+      .order("weekday", { ascending: true });
+
+    if (error) throw error;
+
+    const rows: AvailabilityConfigRow[] = (data || []).map((r) => ({
+      id: r.id,
+      barber_id: r.barber_id,
+      weekday: r.weekday as AvailabilityConfigRow["weekday"],
+      open_time: normalizeTime(r.open_time),
+      close_time: normalizeTime(r.close_time),
+      break_start: r.break_start ? normalizeTime(r.break_start) : null,
+      break_end: r.break_end ? normalizeTime(r.break_end) : null,
+      is_closed: r.is_closed,
+    }));
+
+    return { success: true, data: rows };
+  } catch (error) {
+    const errorMessage =
+      error instanceof Error
+        ? error.message
+        : "Failed to fetch availability config";
+    return { success: false, error: errorMessage };
+  }
+}
+
+export async function updateAvailabilityConfig(
+  rows: AvailabilityConfigRow[]
+): Promise<ServerActionResult<AvailabilityConfigRow[]>> {
+  try {
+    await requireAdmin();
+
+    if (!Array.isArray(rows) || rows.length !== 7) {
+      return { success: false, error: "Expected 7 weekday rows" };
+    }
+
+    const seenWeekdays = new Set<number>();
+    for (const row of rows) {
+      if (
+        typeof row.weekday !== "number" ||
+        row.weekday < 0 ||
+        row.weekday > 6
+      ) {
+        return { success: false, error: "Invalid weekday (must be 0-6)" };
+      }
+      if (seenWeekdays.has(row.weekday)) {
+        return {
+          success: false,
+          error: `Duplicate weekday ${row.weekday}`,
+        };
+      }
+      seenWeekdays.add(row.weekday);
+
+      if (!TIME_RE.test(row.open_time) || !TIME_RE.test(row.close_time)) {
+        return {
+          success: false,
+          error: `Invalid time format on weekday ${row.weekday}`,
+        };
+      }
+      if (timeToMinutes(row.open_time) >= timeToMinutes(row.close_time)) {
+        return {
+          success: false,
+          error: `שעת סגירה חייבת להיות אחרי שעת פתיחה (יום ${row.weekday})`,
+        };
+      }
+
+      const hasStart = row.break_start != null && row.break_start !== "";
+      const hasEnd = row.break_end != null && row.break_end !== "";
+      if (hasStart !== hasEnd) {
+        return {
+          success: false,
+          error: `יש להזין גם תחילת הפסקה וגם סיום הפסקה (יום ${row.weekday})`,
+        };
+      }
+      if (hasStart && hasEnd) {
+        if (
+          !TIME_RE.test(row.break_start as string) ||
+          !TIME_RE.test(row.break_end as string)
+        ) {
+          return {
+            success: false,
+            error: `פורמט הפסקה לא חוקי (יום ${row.weekday})`,
+          };
+        }
+        if (
+          timeToMinutes(row.break_start as string) >=
+          timeToMinutes(row.break_end as string)
+        ) {
+          return {
+            success: false,
+            error: `סיום הפסקה חייב להיות אחרי תחילתה (יום ${row.weekday})`,
+          };
+        }
+      }
+    }
+
+    const supabase = await createClient();
+
+    const payload = rows.map((row) => ({
+      ...(row.id ? { id: row.id } : {}),
+      barber_id: null,
+      weekday: row.weekday,
+      open_time: row.open_time,
+      close_time: row.close_time,
+      break_start:
+        row.break_start && row.break_start !== "" ? row.break_start : null,
+      break_end:
+        row.break_end && row.break_end !== "" ? row.break_end : null,
+      is_closed: !!row.is_closed,
+      updated_at: new Date().toISOString(),
+    }));
+
+    const { error: deleteError } = await supabase
+      .from("availability_config")
+      .delete()
+      .is("barber_id", null);
+
+    if (deleteError) throw deleteError;
+
+    const { data, error } = await supabase
+      .from("availability_config")
+      .insert(payload)
+      .select();
+
+    if (error) throw error;
+
+    revalidatePath("/admin/availability");
+    revalidatePath("/booking");
+    revalidatePath("/");
+
+    const updated: AvailabilityConfigRow[] = (data || [])
+      .map((r) => ({
+        id: r.id,
+        barber_id: r.barber_id,
+        weekday: r.weekday as AvailabilityConfigRow["weekday"],
+        open_time: normalizeTime(r.open_time),
+        close_time: normalizeTime(r.close_time),
+        break_start: r.break_start ? normalizeTime(r.break_start) : null,
+        break_end: r.break_end ? normalizeTime(r.break_end) : null,
+        is_closed: r.is_closed,
+      }))
+      .sort((a, b) => a.weekday - b.weekday);
+
+    return { success: true, data: updated };
+  } catch (error) {
+    const errorMessage =
+      error instanceof Error
+        ? error.message
+        : "Failed to update availability config";
+    return { success: false, error: errorMessage };
+  }
+}
+
+export async function getBlockedDates(): Promise<
+  ServerActionResult<BlockedDate[]>
+> {
+  try {
+    const supabase = createAnonClient();
+    const { data, error } = await supabase
+      .from("blocked_dates")
+      .select("*")
+      .order("date", { ascending: true });
+
+    if (error) throw error;
+
+    return { success: true, data: (data || []) as BlockedDate[] };
+  } catch (error) {
+    const errorMessage =
+      error instanceof Error ? error.message : "Failed to fetch blocked dates";
+    return { success: false, error: errorMessage };
+  }
+}
+
+export async function addBlockedDate(
+  date: string,
+  reason?: string
+): Promise<ServerActionResult<BlockedDate>> {
+  try {
+    await requireAdmin();
+
+    if (!DATE_RE.test(date)) {
+      return { success: false, error: "Invalid date format (YYYY-MM-DD)" };
+    }
+
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from("blocked_dates")
+      .insert([
+        {
+          date,
+          reason: reason && reason.trim() ? reason.trim() : null,
+        },
+      ])
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    revalidatePath("/admin/availability");
+    revalidatePath("/booking");
+
+    return { success: true, data: data as BlockedDate };
+  } catch (error) {
+    const errorMessage =
+      error instanceof Error ? error.message : "Failed to add blocked date";
+    return { success: false, error: errorMessage };
+  }
+}
+
+export async function removeBlockedDate(
+  date: string
+): Promise<ServerActionResult> {
+  try {
+    await requireAdmin();
+
+    if (!DATE_RE.test(date)) {
+      return { success: false, error: "Invalid date format (YYYY-MM-DD)" };
+    }
+
+    const supabase = await createClient();
+    const { error } = await supabase
+      .from("blocked_dates")
+      .delete()
+      .eq("date", date);
+
+    if (error) throw error;
+
+    revalidatePath("/admin/availability");
+    revalidatePath("/booking");
+
+    return { success: true };
+  } catch (error) {
+    const errorMessage =
+      error instanceof Error ? error.message : "Failed to remove blocked date";
+    return { success: false, error: errorMessage };
   }
 }

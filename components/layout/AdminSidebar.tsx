@@ -10,6 +10,7 @@ const NAV_ITEMS = [
   { href: "/admin/services", label: "שירותים", en: "Services" },
   { href: "/admin/content", label: "תוכן אתר", en: "Content" },
   { href: "/admin/gallery", label: "גלריה", en: "Gallery" },
+  { href: "/admin/availability", label: "זמינות", en: "Availability" },
   { href: "/admin/bookings", label: "תורים", en: "Bookings" },
 ];
 

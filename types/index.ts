@@ -27,29 +27,59 @@ export interface GalleryPhoto extends GalleryItem {
   public_url: string;
 }
 
+export type BookingStatus =
+  | "confirmed"
+  | "cancelled"
+  | "completed"
+  | "no_show";
+
 export interface Booking {
   id: string;
   full_name: string;
   phone: string;
-  email: string;
+  email: string | null;
   service_id?: string;
-  preferred_date?: string;
-  preferred_time?: string;
+  slot_start: string | null;
+  slot_end: string | null;
+  status: BookingStatus;
+  barber_id: string | null;
+  preferred_date: string | null;
+  preferred_time: string | null;
   notes?: string;
   created_at: string;
   service?: Service;
 }
 
-export interface BookingFormData {
+export interface BookingInput {
   full_name: string;
   phone: string;
+  email?: string;
   service_id: string;
-  preferred_date: string;
-  preferred_time: string;
+  slot_start: string;
+  notes?: string;
 }
+
+export type BookingFormData = BookingInput;
 
 export interface ServerActionResult<T = void> {
   success: boolean;
   data?: T;
   error?: string;
+}
+
+export interface AvailabilityConfigRow {
+  id?: string;
+  barber_id: string | null;
+  weekday: 0 | 1 | 2 | 3 | 4 | 5 | 6;
+  open_time: string;
+  close_time: string;
+  break_start: string | null;
+  break_end: string | null;
+  is_closed: boolean;
+}
+
+export interface BlockedDate {
+  date: string;
+  reason: string | null;
+  created_at: string;
 }
