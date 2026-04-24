@@ -52,8 +52,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   /sections           — Full-width content blocks (Hero, GalleryPreview, ServicesPreview, About, CTASection)
 /lib
   actions.ts          — Server actions (all data mutations + revalidatePath calls)
-  supabase.ts         — Supabase client factories (client-side only, safe for browser)
-  supabase-server.ts  — Supabase admin client (server-side only, uses service role key)
+  supabase.ts         — Server client (createClient, cookies) + admin client (createServerAdmin, service-role)
+  supabase-browser.ts — Browser client (createClientBrowser, anon key, safe for client components)
   animations.ts       — Framer Motion variants (reusable animation configs)
 /types
   index.ts            — All shared TypeScript interfaces (SiteContent, Service, GalleryPhoto, Booking, etc.)

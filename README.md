@@ -1,272 +1,144 @@
-# קרמליס סטודיו — Carmelis Studio Website
+# קרמליס סטודיו — Carmelis Studio
 
-Complete Next.js 14 website + admin dashboard for a premium men's shaving & grooming studio in Israel.
+Next.js 14 website + admin dashboard for a premium men's shaving & grooming studio in Israel. Hebrew-first, RTL, dark theme.
 
-## 🚀 Quick Start
+**Stack:** Next.js 14 (App Router) · TypeScript (strict) · Tailwind · Supabase (Postgres + Auth + Storage) · Framer Motion · React Hook Form + Zod
 
-### 1. Setup Environment
+## Quick Start
+
+### 1. Environment
+
 ```bash
-cd c:\Users\משתמש\OneDrive\Desktop\AI\SmartCut
 cp .env.local.example .env.local
 ```
 
-Edit `.env.local` and add your Supabase credentials:
-```
-NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
-SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
-```
-
-### 2. Install Dependencies
-```bash
-npm install
-```
-
-### 3. Setup Supabase Database
-
-1. Create a new Supabase project at https://supabase.com
-2. In Supabase SQL Editor, run `migrations.sql`:
-   - Copy the contents of `migrations.sql`
-   - Paste into Supabase SQL Editor
-   - Execute
-
-3. Seed initial data by running `seed.sql`:
-   - Copy the contents of `seed.sql`
-   - Paste into Supabase SQL Editor
-   - Execute
-
-4. Enable Auth:
-   - Go to Supabase Auth settings
-   - Enable Email/Password provider
-   - Create admin user with email and password
-
-5. Create storage bucket:
-   - Go to Storage in Supabase
-   - Create bucket named "gallery"
-   - Make it public
-
-### 4. Run Development Server
-```bash
-npm run dev
-```
-
-Open [http://localhost:3000](http://localhost:3000)
-
-### 5. Access Admin Dashboard
-```
-URL: http://localhost:3000/admin/login
-Email: admin@carmelis-studio.com (or what you created in Supabase)
-Password: (what you set in Supabase)
-```
-
-## 📁 Project Structure
+Then fill in your Supabase credentials in `.env.local` (Supabase Dashboard → Project Settings → API):
 
 ```
-SmartCut/
-├── app/
-│   ├── (public)/
-│   │   ├── page.tsx                 # Homepage
-│   │   ├── services/
-│   │   │   └── page.tsx             # Services listing
-│   │   ├── gallery/
-│   │   │   └── page.tsx             # Gallery with lightbox
-│   │   └── booking/
-│   │       └── page.tsx             # Booking form
-│   ├── (admin)/
-│   │   ├── admin/
-│   │   │   ├── login/page.tsx       # Admin login
-│   │   │   ├── page.tsx             # Dashboard home
-│   │   │   ├── services/page.tsx    # Manage services
-│   │   │   ├── gallery/page.tsx     # Manage gallery
-│   │   │   ├── bookings/page.tsx    # View bookings
-│   │   │   └── content/page.tsx     # Edit site content
-│   │   └── layout.tsx               # Admin layout with sidebar
-│   ├── layout.tsx                   # Root layout
-│   └── globals.css                  # Global styles
-├── components/
-│   ├── providers/
-│   │   └── LanguageProvider.tsx     # Language context (he/en)
-│   ├── layout/
-│   │   ├── Header.tsx               # Navigation header
-│   │   ├── Footer.tsx               # Footer
-│   │   └── AdminSidebar.tsx         # Admin sidebar nav
-│   ├── sections/
-│   │   ├── HeroSection.tsx          # Homepage hero
-│   │   ├── ServicesSection.tsx      # Featured services
-│   │   ├── GallerySection.tsx       # Photo gallery preview
-│   │   └── CTASection.tsx           # Call-to-action
-│   └── ui/
-│       ├── Button.tsx               # Reusable button
-│       ├── Card.tsx                 # Reusable card
-│       ├── Input.tsx                # Form inputs
-│       └── Modal.tsx                # Modal dialog
-├── lib/
-│   ├── supabase.ts                  # Supabase client setup
-│   └── actions.ts                   # Server actions (queries, mutations)
-├── types.ts                          # TypeScript interfaces
-├── migrations.sql                    # Database schema
-├── seed.sql                          # Sample data
-├── package.json                      # Dependencies
-├── next.config.ts                    # Next.js config
-├── tailwind.config.ts                # Tailwind config
-├── tsconfig.json                     # TypeScript config
-└── README.md                         # This file
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
 ```
 
-## 🎨 Design System
-
-### Colors
-- **Background**: `#0d0d0d` (dark)
-- **Accent**: `#c9a84c` (gold)
-- **Light Accent**: `#d4af73` (gold-light)
-- **Text**: `#ffffff` (white)
-
-### Typography
-- **Headings**: Playfair Display (serif)
-- **Body**: Heebo (sans-serif, excellent Hebrew support)
-
-### Responsive Breakpoints
-- Mobile: 375px
-- Tablet: 768px
-- Desktop: 1280px
-
-All pages are mobile-first and fully responsive.
-
-## 📄 Page Descriptions
-
-### Homepage (`/`)
-- Hero section with studio logo and CTA button
-- About section (editable from admin)
-- Featured services grid (3 services)
-- Instagram gallery preview (6 latest photos)
-- Social links and footer
-- Animations: fade-up on scroll, stagger effects
-
-### Services (`/services`)
-- Grid of all services from database
-- Each card: name, description, price, duration
-- "Book Now" button on each card
-- Fully managed from admin dashboard
-
-### Gallery (`/gallery`)
-- Masonry/grid layout of photos
-- Lightbox on click (yet-another-react-lightbox)
-- Photos stored in Supabase Storage
-- Upload/delete from admin dashboard
-
-### Booking (`/booking`)
-- Form with fields: name, phone, email, service, date, time, notes
-- Hebrew labels and placeholders
-- On submit: save to "bookings" table, redirect to Wix booking
-- Mobile-friendly form with RTL layout
-
-### Admin Dashboard (`/admin`)
-- **Login** (`/admin/login`): Email/password auth via Supabase
-- **Dashboard Home** (`/admin`): Overview and quick links
-- **Services** (`/admin/services`): Add/edit/delete services
-- **Gallery** (`/admin/gallery`): Upload/delete photos
-- **Bookings** (`/admin/bookings`): View all booking leads in table
-- **Content** (`/admin/content`): Edit site tagline, about, address, hours
-
-All admin changes update live (Next.js revalidation).
-
-## 🔐 Security & Authentication
-
-- **Admin Auth**: Supabase Auth with email/password
-- **RLS Enabled**: All tables have Row-Level Security
-- **Public Tables**: Services, gallery, site_content readable by anyone
-- **Protected Writes**: Only authenticated users can edit content
-- **Bookings**: Public can insert bookings, only admin can read
-
-## 🚀 Deployment to Vercel
+### 2. Install
 
 ```bash
-# 1. Push to GitHub
-git init
-git add .
-git commit -m "Initial commit"
-git push -u origin main
-
-# 2. Create new project on Vercel
-# Connect GitHub repo
-
-# 3. Set environment variables in Vercel
-# Add same .env vars as .env.local
-
-# 4. Deploy
-# Vercel auto-deploys on git push
+npm ci
 ```
 
-## 📦 Dependencies
+### 3. Supabase setup (one-time)
 
-- **next**: 14.2.15
-- **react**: 18
-- **typescript**: Latest
-- **tailwindcss**: 3.4.1
-- **framer-motion**: 11.11.1 (animations)
-- **@supabase/supabase-js**: 2.45.4 (database)
-- **@supabase/ssr**: 0.5.1 (server-side auth)
-- **react-hook-form**: 7.53.1 (forms)
-- **zod**: 3.23.8 (validation)
-- **yet-another-react-lightbox**: 3.21.5 (gallery lightbox)
+1. Create a project at https://supabase.com.
+2. In the SQL Editor, run `supabase/migrations/001_initial_schema.sql` (tables + RLS policies).
+3. Then run `supabase/migrations/002_storage.sql` (storage notes — the bucket itself is created in the next step).
+4. **Storage** → create a public bucket named `gallery`.
+5. **Authentication** → enable Email/Password, then create an admin user.
+6. Optional: run `supabase/seed.sql` to populate demo services and content.
 
-## 🌐 Language Support
+### 4. Run
 
-- **Default**: Hebrew (עברית)
-- **Secondary**: English
-- **RTL Support**: All pages fully RTL-compatible
-- **Language Toggle**: Implemented via LanguageProvider context
+```bash
+npm run dev         # http://localhost:3000
+npm run build       # production build
+npm run start       # serve production build
+npm run lint        # ESLint
+npx tsc --noEmit    # type check (strict)
+```
 
-## 📱 Mobile Optimization
+### 5. Admin dashboard
 
-- Mobile-first design
-- All pages tested at 375px, 768px, 1280px
-- Touch-friendly buttons and forms
-- Optimized images via Next.js Image component
-- Fast animations (0.3s–0.6s)
+http://localhost:3000/admin/login — sign in with the admin user you created in Supabase.
 
-## 🔗 External Integrations
+## Project Structure
 
-- **Booking**: Links to Wix booking page (existing system)
-- **Payments**: Links to BitPay for payment processing
-- **Instagram**: Links to @carmelis_studio Instagram
-- **Logo**: From Wix (cached)
+```
+app/
+  (public)/                         Customer-facing
+    page.tsx                        Homepage (no navbar, full-viewport hero)
+    services/page.tsx               Services listing
+    gallery/page.tsx                Gallery
+    booking/page.tsx                Booking form (saves + redirects to Wix)
+    template.tsx                    Page transition wrapper
+  (admin)/
+    admin/
+      login/page.tsx                Admin login
+      page.tsx                      Dashboard home
+      services/page.tsx             Services CRUD (+ ServiceModal)
+      gallery/page.tsx              Gallery upload/delete
+      bookings/page.tsx             Booking leads table
+    layout.tsx                      Admin shell (AdminSidebar)
+  layout.tsx                        Root layout (RTL, fonts)
+  globals.css                       Global styles + Tailwind layers
+  robots.ts / sitemap.ts            SEO
 
-## 📧 API Keys & Secrets
+components/
+  ui/                               Button, Card, Input, LogoImage, Modal, SectionDivider
+  layout/                           Navbar, Footer, AdminSidebar, HomePageClient, ScrollBackgroundWrapper
+  sections/                         Hero, GalleryPreview, ServicesPreview, About, CTASection, IntroAnimation(Wrapper), *PageClient
+  providers/                        AnimationProvider, LanguageProvider, ScrollOverlayProvider
 
-Never commit `.env.local`. Use `.env.local.example` as template.
+lib/
+  actions.ts                        All server actions (data mutations + revalidatePath)
+  supabase.ts                       Server client (createClient) + admin client (createServerAdmin, service-role)
+  supabase-browser.ts               Browser client (createClientBrowser)
+  animations.ts                     Framer Motion variants
 
-Required secrets:
-- Supabase URL and keys
-- Admin credentials (for initial setup only)
+types/
+  index.ts                          Shared TypeScript interfaces
 
-## 🐛 Troubleshooting
+supabase/
+  migrations/001_initial_schema.sql
+  migrations/002_storage.sql
+  seed.sql
 
-### RLS Errors
-If you get "new row violates row-level security policy", ensure:
-1. Supabase Auth is enabled
-2. Migrations have been run
-3. RLS policies are created
-4. User is authenticated (for admin actions)
+next.config.mjs · tailwind.config.ts · tsconfig.json · postcss.config.mjs
+```
 
-### Image Not Loading
-- Check Supabase Storage bucket exists and is public
-- Verify storage_path in database matches actual file path
-- Check image URL in Supabase dashboard
+> Homepage intentionally has no Navbar and does not render About or CTASection — those components exist for optional use on other pages. See `CLAUDE.md` for full design constraints.
 
-### RTL Layout Issues
-- Ensure `dir="rtl"` is set on html element in layout.tsx
-- Use Tailwind's RTL-aware utilities
-- Test in browser DevTools (Toggle device toolbar)
+## Design System
 
-## 📞 Support
+- **Colors**: `#0d0d0d` (dark bg), `#141417` (surface), `#c9a84c` (gold accent), `#e2c97e` (gold light), `#f0f0ec` (text), `#7a7a80` (muted)
+- **Typography**: Cormorant Garamond (display/headings) + Heebo (body/Hebrew)
+- **Direction**: RTL (`<html lang="he" dir="rtl">`)
+- **Theme**: Dark only (no light mode)
 
-For issues with:
-- **Supabase**: See https://supabase.com/docs
-- **Next.js**: See https://nextjs.org/docs
-- **Tailwind**: See https://tailwindcss.com/docs
-- **Vercel**: See https://vercel.com/docs
+## Pages
 
-## 📝 License
+- **`/`** — Hero (full viewport, logo, character-staggered headline, CTA) → gallery preview slider (keyboard + drag nav) → services grid → footer
+- **`/services`** — Full services grid, "Book Now" per card
+- **`/gallery`** — Photos from Supabase Storage
+- **`/booking`** — RTL form (name, phone, email, service, date, time, notes) → saves to `bookings` table → redirects to Wix booking page
+- **`/admin/*`** — Email/password auth, Services CRUD, Gallery upload, Bookings view
 
-Private project for Carmelis Studio.
+## Security
+
+- RLS enabled on all tables (see `supabase/migrations/001_initial_schema.sql`)
+- Public tables (`services`, `gallery`, `site_content`): public SELECT, authenticated INSERT/UPDATE/DELETE
+- `bookings`: anonymous INSERT, authenticated SELECT
+- `SUPABASE_SERVICE_ROLE_KEY` is server-only (used by `createServerAdmin` in `lib/supabase.ts`) — never import it into client components
+- `.env.local` is gitignored
+
+## Deployment (Vercel)
+
+1. Push to `master`.
+2. Import the repo in Vercel.
+3. Add the same env vars from `.env.local` to Vercel Project Settings → Environment Variables.
+4. Deploy. Sitemap lives at `/sitemap.xml`, robots at `/robots.txt`.
+
+Pre-deploy checks: `npm run lint`, `npx tsc --noEmit`, `npm run build` all clean.
+
+## Troubleshooting
+
+- **"Missing Supabase environment variables"** — create `.env.local` from the example and restart `npm run dev`.
+- **RLS errors on write** — ensure you're signed in as the admin user; verify migrations ran.
+- **Gallery images 404** — create the `gallery` bucket in Supabase Storage and mark it public.
+- **RTL layout glitches** — confirm `<html dir="rtl" lang="he">` in `app/layout.tsx` hasn't been overridden.
+
+## External Integrations
+
+- **Wix booking**: https://www.carmelis-studio.com/book-online
+- **BitPay payments**: https://www.bitpay.co.il
+- **Instagram**: https://www.instagram.com/carmelis_studio
+
+See `CLAUDE.md` for detailed architecture notes, coding conventions, and design decisions.
