@@ -52,8 +52,6 @@ export function Reviews() {
       className="relative overflow-hidden"
       style={{
         background: "#050505",
-        backgroundImage:
-          "linear-gradient(180deg, rgba(201,168,76,0.04) 0%, transparent 40%, rgba(201,168,76,0.04) 100%)",
       }}
     >
       <div className="relative z-10 max-w-6xl mx-auto px-6 md:px-10 py-24 md:py-32">
@@ -66,10 +64,10 @@ export function Reviews() {
           className="text-center mb-16 md:mb-20"
         >
           <p
-            className="font-label uppercase text-gold-accent mb-4"
+            className="font-label uppercase text-white/40 mb-4"
             style={{
               fontSize: 11,
-              fontWeight: 600,
+              fontWeight: 500,
               letterSpacing: "0.36em",
             }}
           >
@@ -85,12 +83,12 @@ export function Reviews() {
             לקוחות שחזרו, וחוזרים
           </h2>
           <div className="flex items-center justify-center gap-3 mt-6">
-            <span className="h-px w-10 bg-gold-accent/60" />
+            <span className="h-px w-10 bg-white/15" />
             <span
-              className="w-1.5 h-1.5 rotate-45 bg-gold-accent"
+              className="w-1 h-1 rotate-45 bg-white/30"
               aria-hidden
             />
-            <span className="h-px w-10 bg-gold-accent/60" />
+            <span className="h-px w-10 bg-white/15" />
           </div>
         </motion.div>
 
@@ -108,14 +106,14 @@ export function Reviews() {
               variants={card}
               className="relative bg-black p-8 md:p-10 flex flex-col"
               style={{
-                border: "1px solid rgba(201,168,76,0.15)",
+                border: "1px solid rgba(255,255,255,0.06)",
               }}
             >
-              {/* Gold diamond ornament */}
+              {/* Minimal divider ornament */}
               <div className="flex items-center gap-2 mb-6">
-                <span className="h-px w-6 bg-gold-accent/60" />
+                <span className="h-px w-5 bg-white/15" />
                 <span
-                  className="w-1.5 h-1.5 rotate-45 bg-gold-accent"
+                  className="w-1 h-1 rotate-45 bg-white/25"
                   aria-hidden
                 />
               </div>
@@ -135,16 +133,16 @@ export function Reviews() {
               {/* Attribution */}
               <div className="mt-8 pt-6 border-t border-white/10">
                 <div
-                  className="font-display text-gold-accent mb-1"
-                  style={{ fontSize: 18, lineHeight: 1.2 }}
+                  className="font-display text-white/85 mb-1"
+                  style={{ fontSize: 16, lineHeight: 1.2 }}
                 >
                   {review.name}
                 </div>
                 <div
-                  className="font-label uppercase text-white/50"
+                  className="font-label uppercase text-white/35"
                   style={{
                     fontSize: 10,
-                    fontWeight: 600,
+                    fontWeight: 500,
                     letterSpacing: "0.32em",
                   }}
                 >
@@ -163,12 +161,12 @@ export function Reviews() {
           transition={{ duration: 0.7, ease: EASE, delay: 0.2 }}
           className="flex flex-col items-center gap-3 mt-16"
         >
-          <div className="flex items-center gap-1 text-gold-accent">
+          <div className="flex items-center gap-1 text-white/35">
             {Array.from({ length: 5 }).map((_, i) => (
               <svg
                 key={i}
-                width="18"
-                height="18"
+                width="12"
+                height="12"
                 viewBox="0 0 24 24"
                 fill="currentColor"
                 aria-hidden
@@ -178,10 +176,10 @@ export function Reviews() {
             ))}
           </div>
           <div
-            className="font-label uppercase text-white/60"
+            className="font-label uppercase text-white/35"
             style={{
-              fontSize: 11,
-              fontWeight: 600,
+              fontSize: 10,
+              fontWeight: 500,
               letterSpacing: "0.32em",
             }}
           >

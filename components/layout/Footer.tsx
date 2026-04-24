@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { getSiteContent } from "@/lib/actions";
+import { CookiePreferencesButton } from "@/components/legal/CookiePreferencesButton";
 
 export function Footer() {
   const instagramUrl = process.env.NEXT_PUBLIC_INSTAGRAM_URL ?? "#";
@@ -26,7 +27,7 @@ export function Footer() {
     >
       <div className="max-w-7xl mx-auto px-6 md:px-10 py-16 md:py-20">
         {/* Top row: brand + nav columns */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-10 md:gap-12 mb-14">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-10 md:gap-12 mb-14">
           {/* Brand column */}
           <div className="text-center md:text-right">
             <div
@@ -146,6 +147,54 @@ export function Footer() {
               >
                 BitPay
               </a>
+            </div>
+          </div>
+
+          {/* Legal column */}
+          <div className="text-center md:text-left">
+            <h4
+              className="font-label uppercase text-gold-accent mb-5"
+              style={{
+                fontSize: 11,
+                fontWeight: 600,
+                letterSpacing: "0.36em",
+              }}
+            >
+              Legal
+            </h4>
+            <div className="flex flex-col gap-3">
+              <Link
+                href="/privacy"
+                className="font-body text-white/70 hover:text-gold-accent transition-colors"
+                style={{ fontSize: 13, fontWeight: 300 }}
+              >
+                מדיניות פרטיות
+              </Link>
+              <Link
+                href="/terms"
+                className="font-body text-white/70 hover:text-gold-accent transition-colors"
+                style={{ fontSize: 13, fontWeight: 300 }}
+              >
+                תנאי שימוש
+              </Link>
+              <Link
+                href="/cookies"
+                className="font-body text-white/70 hover:text-gold-accent transition-colors"
+                style={{ fontSize: 13, fontWeight: 300 }}
+              >
+                קובצי Cookie
+              </Link>
+              <Link
+                href="/accessibility"
+                className="font-body text-white/70 hover:text-gold-accent transition-colors"
+                style={{ fontSize: 13, fontWeight: 300 }}
+              >
+                הצהרת נגישות
+              </Link>
+              <CookiePreferencesButton
+                label="נהל העדפות Cookie"
+                variant="link"
+              />
             </div>
           </div>
         </div>

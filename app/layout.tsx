@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { AnimationProvider } from "@/components/providers/AnimationProvider";
+import { CookieConsent } from "@/components/legal/CookieConsent";
 import { Heebo, DM_Serif_Display, Montserrat } from "next/font/google";
 
 const heebo = Heebo({
@@ -192,6 +193,7 @@ export default function RootLayout({
         <AnimationProvider>
           {children}
         </AnimationProvider>
+        <CookieConsent />
       </body>
     </html>
   );
