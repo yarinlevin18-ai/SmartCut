@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { usePathname } from "next/navigation";
 import { AdminSidebar } from "@/components/layout/AdminSidebar";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -10,6 +11,12 @@ export default function AdminLayout({
   children: React.ReactNode;
 }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const pathname = usePathname();
+  const isLogin = pathname === "/admin/login";
+
+  if (isLogin) {
+    return <div className="min-h-screen bg-bg">{children}</div>;
+  }
 
   return (
     <div className="flex min-h-screen bg-bg">

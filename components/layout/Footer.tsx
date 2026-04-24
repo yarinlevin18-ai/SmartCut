@@ -92,7 +92,7 @@ export function Footer() {
           className="font-body"
           style={{ color: "#3a3a3a", fontSize: 10, letterSpacing: "0.06em" }}
         >
-          &copy; 2025 קרמליס סטודיו
+          &copy; {new Date().getFullYear()} קרמליס סטודיו
         </span>
       </div>
     </footer>
