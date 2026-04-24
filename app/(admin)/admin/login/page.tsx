@@ -214,7 +214,7 @@ export default function LoginPage() {
           className="text-center font-label uppercase text-white/30 mt-8"
           style={{ fontSize: 10, fontWeight: 500, letterSpacing: "0.32em" }}
         >
-          Carmeli&apos;s Studio · Tel Aviv
+          Carmeli&apos;s Studio
         </p>
       </motion.div>
     </div>

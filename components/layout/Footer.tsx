@@ -181,7 +181,7 @@ export function Footer() {
               letterSpacing: "0.28em",
             }}
           >
-            Tel Aviv · est. 2019
+            Shaving &amp; Grooming Specialists
           </span>
         </div>
       </div>

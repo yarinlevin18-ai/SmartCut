@@ -6,9 +6,6 @@ import { useState } from "react";
 import { usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 
-const PHONE_DISPLAY = "03-9000-000";
-const PHONE_TEL = "+97239000000";
-
 export function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
   const pathname = usePathname();
@@ -81,35 +78,8 @@ export function Navbar() {
           })}
         </nav>
 
-        {/* Phone button + mobile hamburger */}
+        {/* Mobile hamburger */}
         <div className="flex items-center gap-2">
-          <a
-            href={`tel:${PHONE_TEL}`}
-            className="hidden sm:inline-flex items-center gap-2 font-label uppercase text-white hover:text-gold-accent transition-colors"
-            style={{
-              border: "1px solid rgba(255,255,255,0.3)",
-              padding: "10px 18px",
-              fontSize: 12,
-              fontWeight: 700,
-              letterSpacing: "0.12em",
-            }}
-          >
-            <svg
-              width="13"
-              height="13"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden
-            >
-              <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
-            </svg>
-            <span>{PHONE_DISPLAY}</span>
-          </a>
-
           <button
             onClick={() => setMenuOpen(!menuOpen)}
             aria-label={menuOpen ? "סגור תפריט" : "פתח תפריט"}
@@ -170,20 +140,6 @@ export function Navbar() {
                   </Link>
                 );
               })}
-              <a
-                href={`tel:${PHONE_TEL}`}
-                onClick={() => setMenuOpen(false)}
-                className="flex items-center gap-3 px-6 py-4 font-label uppercase text-gold-accent border-t border-white/5"
-                style={{
-                  fontSize: 13,
-                  fontWeight: 700,
-                  letterSpacing: "0.12em",
-                }}
-              >
-                <span>התקשרו</span>
-                <span className="text-white/60">·</span>
-                <span>{PHONE_DISPLAY}</span>
-              </a>
             </div>
           </motion.nav>
         )}

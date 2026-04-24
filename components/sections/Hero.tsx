@@ -1,6 +1,6 @@
 "use client";
 
-import { motion, useReducedMotion, type Variants } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import Link from "next/link";
 import Image from "next/image";
 
@@ -11,36 +11,6 @@ const EASE = [0.22, 1, 0.36, 1] as const;
 
 export function Hero() {
   const shouldReduce = useReducedMotion();
-
-  const wordmarkVariants: Variants = shouldReduce
-    ? { hidden: {}, visible: {} }
-    : {
-        hidden: {},
-        visible: { transition: { staggerChildren: 0.055, delayChildren: 0.3 } },
-      };
-
-  const letterVariants: Variants = shouldReduce
-    ? { hidden: {}, visible: {} }
-    : {
-        hidden: { y: "110%", opacity: 0 },
-        visible: {
-          y: "0%",
-          opacity: 1,
-          transition: { duration: 0.7, ease: EASE },
-        },
-      };
-
-  const fadeUp: Variants = shouldReduce
-    ? { hidden: {}, visible: {} }
-    : {
-        hidden: { opacity: 0, y: 18 },
-        visible: {
-          opacity: 1,
-          y: 0,
-          transition: { duration: 0.8, ease: EASE, delay: 0.9 },
-        },
-      };
-
   const wordmark = "CARMELI'S";
 
   return (
@@ -89,14 +59,14 @@ export function Hero() {
             letterSpacing: "0.36em",
           }}
         >
-          Barbershop · Tel Aviv · est. 2019
+          Shaving & Grooming Specialists
         </motion.span>
 
         {/* Giant wordmark — DM Serif Display */}
         <motion.h1
-          variants={wordmarkVariants}
-          initial="hidden"
-          animate="visible"
+          initial={shouldReduce ? false : { opacity: 0, y: 24 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.9, ease: EASE, delay: 0.3 }}
           className="font-display text-white leading-[0.9]"
           style={{
             fontSize: "clamp(64px, 12vw, 180px)",
@@ -105,21 +75,7 @@ export function Hero() {
           dir="ltr"
           aria-label="Carmeli's Studio"
         >
-          <span className="inline-flex">
-            {wordmark.split("").map((ch, i) => (
-              <span
-                key={`w1-${i}`}
-                style={{ overflow: "hidden", display: "inline-block" }}
-              >
-                <motion.span
-                  variants={letterVariants}
-                  style={{ display: "inline-block" }}
-                >
-                  {ch === " " ? "\u00A0" : ch}
-                </motion.span>
-              </span>
-            ))}
-          </span>
+          {wordmark}
           <span
             className="block font-label uppercase text-white/80 mt-3"
             style={{
@@ -134,9 +90,9 @@ export function Hero() {
 
         {/* Hebrew tagline */}
         <motion.p
-          variants={fadeUp}
-          initial="hidden"
-          animate="visible"
+          initial={shouldReduce ? false : { opacity: 0, y: 18 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8, ease: EASE, delay: 0.9 }}
           className="font-body text-white/75 max-w-xl"
           style={{
             fontSize: "clamp(15px, 1.3vw, 18px)",
@@ -149,18 +105,18 @@ export function Hero() {
 
         {/* Gold divider */}
         <motion.div
-          variants={fadeUp}
-          initial="hidden"
-          animate="visible"
+          initial={shouldReduce ? false : { opacity: 0, scaleX: 0 }}
+          animate={{ opacity: 1, scaleX: 1 }}
+          transition={{ duration: 0.8, ease: EASE, delay: 1.1 }}
           className="bg-gold-accent"
           style={{ width: 56, height: 1 }}
         />
 
         {/* CTA row — two outlined buttons */}
         <motion.div
-          variants={fadeUp}
-          initial="hidden"
-          animate="visible"
+          initial={shouldReduce ? false : { opacity: 0, y: 18 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8, ease: EASE, delay: 1.2 }}
           className="flex flex-col sm:flex-row items-center gap-3 sm:gap-4"
         >
           <Link href="/booking">
