@@ -1,20 +1,27 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { AnimationProvider } from "@/components/providers/AnimationProvider";
-import { Heebo, Cormorant_Garamond } from "next/font/google";
+import { Heebo, DM_Serif_Display, Montserrat } from "next/font/google";
 
 const heebo = Heebo({
   subsets: ["hebrew", "latin"],
-  weight: ["300", "400", "500", "700"],
+  weight: ["300", "400", "500", "700", "800"],
   variable: "--font-body",
   display: "swap",
 });
 
-const cormorant = Cormorant_Garamond({
+const dmSerif = DM_Serif_Display({
   subsets: ["latin"],
-  weight: ["400", "600"],
+  weight: ["400"],
   style: ["normal", "italic"],
   variable: "--font-display",
+  display: "swap",
+});
+
+const montserrat = Montserrat({
+  subsets: ["latin"],
+  weight: ["500", "600", "700"],
+  variable: "--font-label",
   display: "swap",
 });
 
@@ -174,7 +181,7 @@ export default function RootLayout({
   };
 
   return (
-    <html lang="he" dir="rtl" suppressHydrationWarning className={`${heebo.variable} ${cormorant.variable}`}>
+    <html lang="he" dir="rtl" suppressHydrationWarning className={`${heebo.variable} ${dmSerif.variable} ${montserrat.variable}`}>
       <head>
         <script
           type="application/ld+json"

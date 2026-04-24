@@ -21,7 +21,12 @@ const config: Config = {
       fontFamily: {
         display: ["var(--font-display)", "Georgia", "serif"],
         body: ["var(--font-body)", "Arial", "sans-serif"],
+        label: ["var(--font-label)", "Arial", "sans-serif"],
         logo: ["var(--font-display)", "Georgia", "serif"],
+      },
+      letterSpacing: {
+        nav: "0.18em",
+        label: "0.22em",
       },
       animation: {
         "fade-up": "fadeUp 0.6s ease-out",

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { motion } from "framer-motion";
 import { createService, updateService } from "@/lib/actions";
 import type { Service } from "@/types";
 
@@ -8,6 +9,19 @@ interface ServiceModalProps {
   service: Service | null;
   onClose: () => void;
 }
+
+const inputStyle = {
+  border: "1px solid rgba(255,255,255,0.15)",
+  fontSize: 14,
+  fontWeight: 400 as const,
+  borderRadius: 0,
+};
+
+const labelStyle = {
+  fontSize: 10,
+  fontWeight: 600 as const,
+  letterSpacing: "0.32em",
+};
 
 export function ServiceModal({ service, onClose }: ServiceModalProps) {
   const [name, setName] = useState("");
@@ -45,12 +59,9 @@ export function ServiceModal({ service, onClose }: ServiceModalProps) {
         display_order: parseInt(display_order) || 0,
       };
 
-      let result;
-      if (service) {
-        result = await updateService(service.id, serviceData);
-      } else {
-        result = await createService(serviceData);
-      }
+      const result = service
+        ? await updateService(service.id, serviceData)
+        : await createService(serviceData);
 
       if (!result.success) {
         setError("Failed to save service: " + result.error);
@@ -59,42 +70,87 @@ export function ServiceModal({ service, onClose }: ServiceModalProps) {
       }
 
       onClose();
-    } catch (err) {
+    } catch {
       setError("Failed to save service");
       setLoading(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-surface border border-white/10 rounded-lg p-8 w-full max-w-md">
-        <h2 className="text-2xl font-bold text-text mb-6">
-          {service ? "Edit Service" : "Add Service"}
-        </h2>
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-6 overflow-y-auto"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ scale: 0.96, opacity: 0, y: 10 }}
+        animate={{ scale: 1, opacity: 1, y: 0 }}
+        exit={{ scale: 0.96, opacity: 0, y: 10 }}
+        transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+        onClick={(e) => e.stopPropagation()}
+        className="bg-[#0a0a0a] p-8 md:p-10 w-full max-w-lg my-8"
+        style={{ border: "1px solid rgba(201,168,76,0.25)" }}
+      >
+        {/* Header */}
+        <div className="mb-8">
+          <p
+            className="font-label uppercase text-gold-accent mb-2"
+            style={{
+              fontSize: 10,
+              fontWeight: 600,
+              letterSpacing: "0.32em",
+            }}
+          >
+            {service ? "Edit · עריכה" : "New · חדש"}
+          </p>
+          <h2
+            className="font-display text-white"
+            style={{ fontSize: 28, lineHeight: 1.1 }}
+          >
+            {service ? "עריכת שירות" : "שירות חדש"}
+          </h2>
+          <div className="flex items-center gap-2 mt-4">
+            <span className="h-px w-10 bg-gold-accent/60" />
+            <span
+              className="w-1.5 h-1.5 rotate-45 bg-gold-accent"
+              aria-hidden
+            />
+          </div>
+        </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-5">
           <div>
-            <label className="block text-sm font-medium text-text mb-2">
-              Name *
+            <label
+              className="block font-label uppercase text-gold-accent mb-2"
+              style={labelStyle}
+            >
+              שם · Name *
             </label>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full px-4 py-2 bg-bg border border-white/10 rounded text-text placeholder-muted focus:outline-none focus:border-gold transition-colors"
+              className="w-full px-4 py-3 bg-black text-white placeholder-white/30 font-body focus:outline-none focus:border-gold-accent transition-colors"
+              style={inputStyle}
               required
               disabled={loading}
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-text mb-2">
-              Description
+            <label
+              className="block font-label uppercase text-gold-accent mb-2"
+              style={labelStyle}
+            >
+              תיאור · Description
             </label>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              className="w-full px-4 py-2 bg-bg border border-white/10 rounded text-text placeholder-muted focus:outline-none focus:border-gold transition-colors"
+              className="w-full px-4 py-3 bg-black text-white placeholder-white/30 font-body focus:outline-none focus:border-gold-accent transition-colors resize-none"
+              style={inputStyle}
               rows={3}
               disabled={loading}
             />
@@ -102,63 +158,92 @@ export function ServiceModal({ service, onClose }: ServiceModalProps) {
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-text mb-2">
-                Price (ILS) *
+              <label
+                className="block font-label uppercase text-gold-accent mb-2"
+                style={labelStyle}
+              >
+                מחיר · ₪ *
               </label>
               <input
                 type="number"
                 value={price}
                 onChange={(e) => setPrice(e.target.value)}
-                className="w-full px-4 py-2 bg-bg border border-white/10 rounded text-text placeholder-muted focus:outline-none focus:border-gold transition-colors"
+                className="w-full px-4 py-3 bg-black text-white placeholder-white/30 font-body focus:outline-none focus:border-gold-accent transition-colors"
+                style={inputStyle}
                 required
                 disabled={loading}
+                dir="ltr"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-text mb-2">
-                Duration (min) *
+              <label
+                className="block font-label uppercase text-gold-accent mb-2"
+                style={labelStyle}
+              >
+                זמן · Min *
               </label>
               <input
                 type="number"
                 value={duration_minutes}
                 onChange={(e) => setDurationMinutes(e.target.value)}
-                className="w-full px-4 py-2 bg-bg border border-white/10 rounded text-text placeholder-muted focus:outline-none focus:border-gold transition-colors"
+                className="w-full px-4 py-3 bg-black text-white placeholder-white/30 font-body focus:outline-none focus:border-gold-accent transition-colors"
+                style={inputStyle}
                 required
                 disabled={loading}
+                dir="ltr"
               />
             </div>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-text mb-2">
-              Icon (emoji)
-            </label>
-            <input
-              type="text"
-              value={icon}
-              onChange={(e) => setIcon(e.target.value)}
-              className="w-full px-4 py-2 bg-bg border border-white/10 rounded text-text placeholder-muted focus:outline-none focus:border-gold transition-colors"
-              placeholder="✂️"
-              disabled={loading}
-            />
-          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label
+                className="block font-label uppercase text-gold-accent mb-2"
+                style={labelStyle}
+              >
+                אייקון · Icon
+              </label>
+              <input
+                type="text"
+                value={icon}
+                onChange={(e) => setIcon(e.target.value)}
+                className="w-full px-4 py-3 bg-black text-white placeholder-white/30 font-body focus:outline-none focus:border-gold-accent transition-colors"
+                style={inputStyle}
+                placeholder="✂️"
+                disabled={loading}
+              />
+            </div>
 
-          <div>
-            <label className="block text-sm font-medium text-text mb-2">
-              Display Order
-            </label>
-            <input
-              type="number"
-              value={display_order}
-              onChange={(e) => setDisplayOrder(e.target.value)}
-              className="w-full px-4 py-2 bg-bg border border-white/10 rounded text-text placeholder-muted focus:outline-none focus:border-gold transition-colors"
-              disabled={loading}
-            />
+            <div>
+              <label
+                className="block font-label uppercase text-gold-accent mb-2"
+                style={labelStyle}
+              >
+                סדר · Order
+              </label>
+              <input
+                type="number"
+                value={display_order}
+                onChange={(e) => setDisplayOrder(e.target.value)}
+                className="w-full px-4 py-3 bg-black text-white placeholder-white/30 font-body focus:outline-none focus:border-gold-accent transition-colors"
+                style={inputStyle}
+                disabled={loading}
+                dir="ltr"
+              />
+            </div>
           </div>
 
           {error && (
-            <div className="bg-red-500/10 border border-red-500/20 rounded px-4 py-3 text-red-400 text-sm">
+            <div
+              className="px-4 py-3 font-body text-red-300"
+              style={{
+                background: "rgba(239,68,68,0.08)",
+                border: "1px solid rgba(239,68,68,0.25)",
+                fontSize: 13,
+                borderRadius: 0,
+              }}
+            >
               {error}
             </div>
           )}
@@ -167,21 +252,41 @@ export function ServiceModal({ service, onClose }: ServiceModalProps) {
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 px-4 py-2 border border-white/10 rounded text-text hover:bg-white/5 transition-colors disabled:opacity-50"
               disabled={loading}
+              className="flex-1 font-label uppercase hover:bg-white/5 transition-all disabled:opacity-50"
+              style={{
+                border: "1px solid rgba(255,255,255,0.2)",
+                color: "rgba(255,255,255,0.85)",
+                background: "transparent",
+                fontSize: 11,
+                fontWeight: 600,
+                padding: "12px 20px",
+                borderRadius: 0,
+                letterSpacing: "0.24em",
+              }}
             >
-              Cancel
+              ביטול
             </button>
             <button
               type="submit"
-              className="flex-1 px-4 py-2 bg-gold text-dark font-semibold rounded hover:bg-gold-light transition-colors disabled:opacity-50"
               disabled={loading}
+              className="flex-1 font-label uppercase hover:bg-gold-light transition-all disabled:opacity-50"
+              style={{
+                border: "1px solid #c9a84c",
+                color: "#000",
+                background: "#c9a84c",
+                fontSize: 11,
+                fontWeight: 700,
+                padding: "12px 20px",
+                borderRadius: 0,
+                letterSpacing: "0.28em",
+              }}
             >
-              {loading ? "Saving..." : "Save"}
+              {loading ? "…" : "שמור"}
             </button>
           </div>
         </form>
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 }

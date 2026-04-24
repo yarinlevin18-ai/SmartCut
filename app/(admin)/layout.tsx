@@ -15,54 +15,63 @@ export default function AdminLayout({
   const isLogin = pathname === "/admin/login";
 
   if (isLogin) {
-    return <div className="min-h-screen bg-bg">{children}</div>;
+    return <div className="min-h-screen bg-black">{children}</div>;
   }
 
   return (
-    <div className="flex min-h-screen bg-bg">
-      {/* Mobile hamburger button */}
+    <div className="flex min-h-screen bg-black" dir="rtl">
+      {/* Mobile hamburger */}
       <button
         onClick={() => setSidebarOpen(!sidebarOpen)}
-        className="md:hidden fixed top-4 right-4 z-40 flex flex-col justify-center items-center gap-1 w-12 h-12 rounded bg-surface border border-white/10 hover:bg-white/5"
-        aria-label={sidebarOpen ? "Close menu" : "Open menu"}
+        className="md:hidden fixed top-4 left-4 z-40 flex flex-col justify-center items-center gap-1.5 w-11 h-11"
+        style={{
+          background: "#080808",
+          border: "1px solid rgba(201,168,76,0.25)",
+        }}
+        aria-label={sidebarOpen ? "סגור תפריט" : "פתח תפריט"}
       >
-        <motion.div
+        <motion.span
           animate={{ rotate: sidebarOpen ? 45 : 0, y: sidebarOpen ? 6 : 0 }}
           transition={{ duration: 0.2 }}
-          className="w-6 h-0.5 bg-gold-accent"
+          className="w-5 h-px bg-gold-accent"
         />
-        <motion.div
+        <motion.span
           animate={{ opacity: sidebarOpen ? 0 : 1 }}
           transition={{ duration: 0.2 }}
-          className="w-6 h-0.5 bg-gold-accent"
+          className="w-5 h-px bg-gold-accent"
         />
-        <motion.div
+        <motion.span
           animate={{ rotate: sidebarOpen ? -45 : 0, y: sidebarOpen ? -6 : 0 }}
           transition={{ duration: 0.2 }}
-          className="w-6 h-0.5 bg-gold-accent"
+          className="w-5 h-px bg-gold-accent"
         />
       </button>
 
-      {/* Sidebar - hidden on mobile, visible on md+ */}
+      {/* Desktop sidebar */}
       <div className="hidden md:block">
         <AdminSidebar />
       </div>
 
-      {/* Mobile sidebar - shown when sidebarOpen */}
+      {/* Mobile sidebar */}
       <AnimatePresence>
         {sidebarOpen && (
           <motion.div
-            key="mobile-sidebar"
-            initial={{ opacity: 0, x: 264 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: 264 }}
+            key="mobile-sidebar-backdrop"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
-            className="md:hidden fixed inset-0 z-30 bg-black/50"
+            className="md:hidden fixed inset-0 z-30 bg-black/70 backdrop-blur-sm"
             onClick={() => setSidebarOpen(false)}
           >
             <motion.div
+              key="mobile-sidebar-panel"
+              initial={{ x: "100%" }}
+              animate={{ x: 0 }}
+              exit={{ x: "100%" }}
+              transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
               onClick={(e) => e.stopPropagation()}
-              className="w-64 h-full"
+              className="absolute right-0 top-0 h-full"
             >
               <AdminSidebar />
             </motion.div>
@@ -72,7 +81,7 @@ export default function AdminLayout({
 
       {/* Main content */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        <main className="flex-1 overflow-auto px-4 md:px-8 py-4 md:py-8">
+        <main className="flex-1 overflow-auto px-5 md:px-10 py-8 md:py-12">
           {children}
         </main>
       </div>

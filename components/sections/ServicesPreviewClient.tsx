@@ -1,107 +1,150 @@
 "use client";
 
-import { motion, useReducedMotion } from "framer-motion";
+import { motion, useReducedMotion, type Variants } from "framer-motion";
 import { Service } from "@/types";
 import Link from "next/link";
-import { containerVariants, itemVariants } from "@/lib/animations";
 
 interface ServicesPreviewClientProps {
   services: Service[];
 }
 
+const EASE = [0.22, 1, 0.36, 1] as const;
+
 export function ServicesPreviewClient({ services }: ServicesPreviewClientProps) {
   const shouldReduce = useReducedMotion();
 
+  const container: Variants = shouldReduce
+    ? { hidden: {}, visible: {} }
+    : {
+        hidden: {},
+        visible: { transition: { staggerChildren: 0.08, delayChildren: 0.05 } },
+      };
+
+  const row: Variants = shouldReduce
+    ? { hidden: {}, visible: {} }
+    : {
+        hidden: { opacity: 0, y: 22 },
+        visible: {
+          opacity: 1,
+          y: 0,
+          transition: { duration: 0.7, ease: EASE },
+        },
+      };
+
   return (
     <section
-      className="relative overflow-hidden"
+      id="menu"
+      className="relative overflow-hidden bg-black"
       style={{
-        background:
-          "radial-gradient(ellipse at 20% 30%, rgba(201,168,76,0.04) 0%, transparent 60%), radial-gradient(ellipse at 80% 70%, rgba(201,168,76,0.03) 0%, transparent 60%), repeating-linear-gradient(45deg, transparent, transparent 40px, rgba(201,168,76,0.015) 40px, rgba(201,168,76,0.015) 41px)",
-        backgroundColor: "#0b0b0d",
+        backgroundImage:
+          "radial-gradient(ellipse at 50% 0%, rgba(201,168,76,0.08) 0%, transparent 60%)",
       }}
     >
-      <div className="relative z-10 px-5 md:px-10 py-[72px]">
-        {/* Section heading */}
-        <div className="text-center mb-11">
+      <div className="relative z-10 max-w-5xl mx-auto px-6 md:px-10 py-24 md:py-32">
+        {/* Eyebrow + heading */}
+        <motion.div
+          initial={shouldReduce ? false : { opacity: 0, y: 14 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: "-80px" }}
+          transition={{ duration: 0.7, ease: EASE }}
+          className="text-center mb-14 md:mb-20"
+        >
           <p
-            className="font-body text-gold-accent mb-[10px]"
-            style={{ fontSize: 11, letterSpacing: "0.22em", textTransform: "uppercase", fontWeight: 400 }}
+            className="font-label uppercase text-gold-accent mb-4"
+            style={{
+              fontSize: 11,
+              fontWeight: 600,
+              letterSpacing: "0.36em",
+            }}
           >
-            הסטודיו
+            Menu · מחירון
           </p>
           <h2
-            className="font-body text-text"
-            style={{ fontSize: 32, fontWeight: 300, letterSpacing: "0.08em" }}
+            className="font-display text-white"
+            style={{
+              fontSize: "clamp(40px, 6vw, 72px)",
+              lineHeight: 1,
+            }}
           >
-            השירותים שלנו
+            מחירון שירותים
           </h2>
-          <div className="w-10 h-[1.5px] bg-gold-accent mx-auto mt-3" />
-        </div>
+          <div className="flex items-center justify-center gap-3 mt-6">
+            <span className="h-px w-10 bg-gold-accent/60" />
+            <span
+              className="w-1.5 h-1.5 rotate-45 bg-gold-accent"
+              aria-hidden
+            />
+            <span className="h-px w-10 bg-gold-accent/60" />
+          </div>
+        </motion.div>
 
-        {/* Cards grid */}
-        <motion.div
-          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3"
-          variants={shouldReduce ? {} : containerVariants}
+        {/* Dotted-leader menu */}
+        <motion.ul
+          variants={container}
           initial="hidden"
           whileInView="visible"
-          viewport={{ once: true, margin: "-80px" }}
+          viewport={{ once: true, margin: "-60px" }}
+          className="flex flex-col divide-y divide-white/10"
         >
           {services.map((service) => (
-            <motion.div
-              key={service.id}
-              variants={shouldReduce ? {} : itemVariants}
-              className="rounded-lg p-6"
-              style={{
-                background: "rgba(20,20,23,0.85)",
-                border: "1px solid rgba(255,255,255,0.07)",
-                borderTop: "2px solid #c9a84c",
-              }}
-            >
-              {/* Service name in display italic */}
-              <p
-                className="font-display italic text-gold-accent mb-1"
-                style={{ fontSize: 22, fontWeight: 600 }}
-              >
-                {service.name}
-              </p>
-
-              {/* Description */}
-              <p className="font-body text-muted mb-[18px]" style={{ fontSize: 12, lineHeight: 1.7 }}>
-                {service.description ?? ""}
-              </p>
-
-              {/* Meta row */}
-              <div
-                className="flex justify-between items-end pt-3"
-                style={{ borderTop: "1px solid rgba(255,255,255,0.07)" }}
+            <motion.li key={service.id} variants={row} className="py-6 md:py-7">
+              <Link
+                href={`/booking?service=${service.id}`}
+                className="group flex items-baseline gap-4 md:gap-6 hover:text-gold-accent transition-colors"
               >
                 <span
-                  className="font-display text-gold-accent"
-                  style={{ fontSize: 22 }}
+                  className="font-display text-white group-hover:text-gold-accent transition-colors"
+                  style={{
+                    fontSize: "clamp(22px, 2.6vw, 32px)",
+                    lineHeight: 1.1,
+                  }}
+                >
+                  {service.name}
+                </span>
+                <span
+                  aria-hidden
+                  className="flex-1 border-b border-dotted border-white/25 translate-y-[-6px]"
+                />
+                <span
+                  className="font-display text-gold-accent shrink-0"
+                  style={{ fontSize: "clamp(20px, 2.2vw, 28px)" }}
                 >
                   ₪{service.price}
                 </span>
-                <Link
-                  href={`/booking?service=${service.id}`}
-                  className="font-body text-muted hover:text-gold-accent transition-colors"
-                  style={{ fontSize: 12 }}
+              </Link>
+              {service.description && (
+                <p
+                  className="font-body text-white/55 mt-2 md:mt-3"
+                  style={{ fontSize: 14, lineHeight: 1.75, fontWeight: 300 }}
                 >
-                  הזמן &rarr;
-                </Link>
-              </div>
-            </motion.div>
+                  {service.description}
+                  {service.duration_minutes ? (
+                    <span
+                      className="font-label uppercase text-white/35 mr-3"
+                      style={{
+                        fontSize: 10,
+                        fontWeight: 600,
+                        letterSpacing: "0.28em",
+                      }}
+                    >
+                      · {service.duration_minutes} דק&apos;
+                    </span>
+                  ) : null}
+                </p>
+              )}
+            </motion.li>
           ))}
-        </motion.div>
+        </motion.ul>
 
-        {/* View all link */}
-        <div className="text-center mt-10">
+        {/* View all CTA */}
+        <div className="text-center mt-16">
           <Link
             href="/services"
-            className="font-body text-muted hover:text-gold-accent transition-colors"
-            style={{ fontSize: 12, letterSpacing: "0.1em" }}
+            className="inline-flex items-center gap-3 font-label uppercase text-white/80 hover:text-gold-accent transition-colors"
+            style={{ fontSize: 12, fontWeight: 600, letterSpacing: "0.28em" }}
           >
-            לכל השירותים →
+            <span>כל השירותים</span>
+            <span aria-hidden>→</span>
           </Link>
         </div>
       </div>

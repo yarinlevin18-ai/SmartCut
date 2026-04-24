@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { GalleryPhoto } from "@/types";
 import Image from "next/image";
 import Link from "next/link";
@@ -10,48 +10,30 @@ interface GalleryPreviewClientProps {
   photos: GalleryPhoto[];
 }
 
+const EASE = [0.22, 1, 0.36, 1] as const;
+
 export function GalleryPreviewClient({ photos }: GalleryPreviewClientProps) {
   const [current, setCurrent] = useState(0);
-  const [nextIndex, setNextIndex] = useState<number | null>(null);
   const [direction, setDirection] = useState(0);
-  const [isTransitioning, setIsTransitioning] = useState(false);
+  const shouldReduce = useReducedMotion();
 
   const goTo = useCallback(
     (index: number, dir: number) => {
-      if (isTransitioning) return;
       const newIndex = (index + photos.length) % photos.length;
       if (newIndex === current) return;
-
       setDirection(dir);
-      setNextIndex(newIndex);
-      setIsTransitioning(true);
-
-      // Step 1: animate exit of current slide (outgoing fg)
-      // Step 2: After 280ms, set next slide and start entry animation
-      const timer = setTimeout(() => {
-        setCurrent(newIndex);
-        setNextIndex(null);
-        setIsTransitioning(false);
-      }, 280);
-
-      return () => clearTimeout(timer);
+      setCurrent(newIndex);
     },
-    [current, photos.length, isTransitioning]
+    [current, photos.length]
   );
 
   const prev = useCallback(() => goTo(current - 1, -1), [current, goTo]);
   const next = useCallback(() => goTo(current + 1, 1), [current, goTo]);
 
-  // Keyboard navigation
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (e.key === "ArrowLeft") {
-        // RTL: ArrowLeft = next
-        next();
-      } else if (e.key === "ArrowRight") {
-        // RTL: ArrowRight = prev
-        prev();
-      }
+      if (e.key === "ArrowLeft") next();
+      else if (e.key === "ArrowRight") prev();
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
@@ -59,196 +41,230 @@ export function GalleryPreviewClient({ photos }: GalleryPreviewClientProps) {
 
   if (photos.length === 0) {
     return (
-      <section
-        className="px-5 md:px-10 py-[72px]"
-        style={{ backgroundColor: "#0b0b0d" }}
-      >
-        <p className="text-center text-muted font-body text-sm">אין תמונות בגלריה עדיין</p>
+      <section className="bg-black px-5 md:px-10 py-24">
+        <p className="text-center text-white/40 font-body text-sm">
+          אין תמונות בגלריה עדיין
+        </p>
       </section>
     );
   }
 
   const activePhoto = photos[current];
-  const displayPhoto = nextIndex !== null ? photos[nextIndex] : activePhoto;
 
   return (
     <section
-      className="relative overflow-hidden"
-      style={{ backgroundColor: "#0b0b0d" }}
+      id="gallery"
+      className="relative overflow-hidden bg-black"
+      style={{
+        backgroundImage:
+          "radial-gradient(ellipse at 50% 100%, rgba(201,168,76,0.06) 0%, transparent 60%)",
+      }}
     >
-      <div className="relative z-10 px-5 md:px-10 py-[72px]">
-        {/* Section heading */}
-        <div className="text-center mb-9">
+      <div className="relative z-10 max-w-6xl mx-auto px-6 md:px-10 py-24 md:py-32">
+        {/* Heading */}
+        <motion.div
+          initial={shouldReduce ? false : { opacity: 0, y: 14 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: "-80px" }}
+          transition={{ duration: 0.7, ease: EASE }}
+          className="text-center mb-14 md:mb-20"
+        >
           <p
-            className="font-body text-gold-accent mb-[10px]"
-            style={{ fontSize: 11, letterSpacing: "0.22em", textTransform: "uppercase", fontWeight: 400 }}
+            className="font-label uppercase text-gold-accent mb-4"
+            style={{
+              fontSize: 11,
+              fontWeight: 600,
+              letterSpacing: "0.36em",
+            }}
           >
-            גלריה
+            Gallery · גלריה
           </p>
           <h2
-            className="font-body text-text"
-            style={{ fontSize: 32, fontWeight: 300, letterSpacing: "0.08em" }}
+            className="font-display text-white"
+            style={{
+              fontSize: "clamp(40px, 6vw, 72px)",
+              lineHeight: 1,
+            }}
           >
             העבודות שלנו
           </h2>
-          <div className="w-10 h-[1.5px] bg-gold-accent mx-auto mt-3" />
-        </div>
+          <div className="flex items-center justify-center gap-3 mt-6">
+            <span className="h-px w-10 bg-gold-accent/60" />
+            <span
+              className="w-1.5 h-1.5 rotate-45 bg-gold-accent"
+              aria-hidden
+            />
+            <span className="h-px w-10 bg-gold-accent/60" />
+          </div>
+        </motion.div>
 
-        {/* Slider */}
-        <div
-          className="relative rounded-lg overflow-hidden bg-[#111] cursor-grab active:cursor-grabbing"
-          style={{ height: 520 }}
+        {/* Slider frame */}
+        <motion.div
+          initial={shouldReduce ? false : { opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: "-60px" }}
+          transition={{ duration: 0.8, ease: EASE }}
+          className="relative overflow-hidden bg-[#0a0a0a]"
+          style={{
+            aspectRatio: "16 / 10",
+            border: "1px solid rgba(201,168,76,0.18)",
+          }}
         >
-          {/* Blurred background */}
-          {displayPhoto.public_url && (
+          {/* Blurred backdrop */}
+          {activePhoto.public_url && (
             <div
+              aria-hidden
               className="absolute pointer-events-none"
               style={{
-                inset: "-20px",
-                backgroundImage: `url(${displayPhoto.public_url})`,
+                inset: "-30px",
+                backgroundImage: `url(${activePhoto.public_url})`,
                 backgroundSize: "cover",
                 backgroundPosition: "center",
-                filter: "blur(14px) brightness(0.25) saturate(0.5)",
-                transform: "scale(1.1)",
+                filter: "blur(20px) brightness(0.22) saturate(0.6)",
+                transform: "scale(1.15)",
               }}
             />
           )}
 
-          {/* Foreground slide - current photo (exiting if transitioning) */}
-          {activePhoto.public_url && (
+          <AnimatePresence mode="wait" initial={false} custom={direction}>
             <motion.div
-              className="absolute inset-0 flex items-center justify-center"
-              initial={false}
-              animate={
-                isTransitioning && nextIndex !== null
-                  ? { x: direction > 0 ? 90 : -90, opacity: 0 }
-                  : { x: 0, opacity: 1 }
+              key={current}
+              custom={direction}
+              initial={
+                shouldReduce
+                  ? { opacity: 0 }
+                  : { x: direction > 0 ? 60 : -60, opacity: 0 }
               }
-              transition={
-                isTransitioning && nextIndex !== null
-                  ? { duration: 0.45, ease: [0.22, 1, 0.36, 1] }
-                  : { duration: 0 }
-              }
-              drag="x"
-              dragConstraints={{ left: 0, right: 0 }}
-              dragElastic={0.1}
-              onDragEnd={(_e, info) => {
-                if (info.offset.x < -40) next();
-                else if (info.offset.x > 40) prev();
-              }}
-            >
-              <div className="relative h-full" style={{ width: "65%" }}>
-                <Image
-                  src={activePhoto.public_url}
-                  alt={activePhoto.caption || "Gallery photo"}
-                  fill
-                  sizes="65vw"
-                  className="object-cover object-top rounded"
-                  draggable={false}
-                />
-              </div>
-            </motion.div>
-          )}
-
-          {/* Foreground slide - next photo (entering if transitioning) */}
-          {isTransitioning && nextIndex !== null && displayPhoto.public_url && (
-            <motion.div
-              className="absolute inset-0 flex items-center justify-center"
-              initial={{ x: direction > 0 ? -70 : 70, opacity: 0.2 }}
               animate={{ x: 0, opacity: 1 }}
-              transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-              drag="x"
+              exit={
+                shouldReduce
+                  ? { opacity: 0 }
+                  : { x: direction > 0 ? -60 : 60, opacity: 0 }
+              }
+              transition={{ duration: 0.55, ease: EASE }}
+              drag={shouldReduce ? false : "x"}
               dragConstraints={{ left: 0, right: 0 }}
-              dragElastic={0.1}
+              dragElastic={0.12}
               onDragEnd={(_e, info) => {
-                if (info.offset.x < -40) next();
-                else if (info.offset.x > 40) prev();
+                if (info.offset.x < -50) next();
+                else if (info.offset.x > 50) prev();
+              }}
+              className="absolute inset-0 flex items-center justify-center"
+            >
+              {activePhoto.public_url && (
+                <div className="relative h-full w-full">
+                  <Image
+                    src={activePhoto.public_url}
+                    alt={activePhoto.caption || "Gallery photo"}
+                    fill
+                    sizes="(max-width: 1024px) 100vw, 1024px"
+                    className="object-contain"
+                    draggable={false}
+                    priority={current === 0}
+                  />
+                </div>
+              )}
+            </motion.div>
+          </AnimatePresence>
+
+          {/* Caption overlay */}
+          {activePhoto.caption && (
+            <div
+              className="absolute left-0 right-0 bottom-0 z-10 px-6 md:px-10 py-5 pointer-events-none"
+              style={{
+                background:
+                  "linear-gradient(to top, rgba(0,0,0,0.85) 0%, transparent 100%)",
               }}
             >
-              <div className="relative h-full" style={{ width: "65%" }}>
-                <Image
-                  src={displayPhoto.public_url}
-                  alt={displayPhoto.caption || "Gallery photo"}
-                  fill
-                  sizes="65vw"
-                  className="object-cover object-top rounded"
-                  draggable={false}
-                />
-              </div>
-            </motion.div>
+              <p
+                className="font-body text-white/85 text-center"
+                style={{ fontSize: 14, fontWeight: 300, letterSpacing: "0.02em" }}
+              >
+                {activePhoto.caption}
+              </p>
+            </div>
           )}
-        </div>
+        </motion.div>
 
         {/* Controls */}
-        <div className="flex items-center justify-between mt-4 px-1">
-          {/* Dots */}
-          <div className="flex gap-2">
-            {photos.map((_, i) => (
-              <button
-                key={i}
-                aria-label={`תמונה ${i + 1}`}
-                onClick={() => goTo(i, i > current ? 1 : -1)}
-                className="rounded-full border-none p-0 transition-all duration-200"
-                style={{
-                  width: 7,
-                  height: 7,
-                  background: i === current ? "#c9a84c" : "rgba(255,255,255,0.15)",
-                  transform: i === current ? "scale(1.35)" : "scale(1)",
-                }}
-              />
-            ))}
+        <div className="flex items-center justify-between mt-8 gap-6">
+          {/* Prev arrow */}
+          <button
+            aria-label="הקודם"
+            onClick={prev}
+            className="flex items-center justify-center transition-all hover:bg-gold-accent hover:text-black"
+            style={{
+              width: 48,
+              height: 48,
+              border: "1px solid rgba(201,168,76,0.4)",
+              color: "#c9a84c",
+              background: "transparent",
+              borderRadius: 0,
+            }}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <polyline points="9 18 15 12 9 6" />
+            </svg>
+          </button>
+
+          {/* Counter + dots */}
+          <div className="flex flex-col items-center gap-3 flex-1">
+            <span
+              className="font-label uppercase text-white/60"
+              style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.36em" }}
+            >
+              {String(current + 1).padStart(2, "0")} &nbsp;/&nbsp;{" "}
+              {String(photos.length).padStart(2, "0")}
+            </span>
+            <div className="flex gap-2">
+              {photos.map((_, i) => (
+                <button
+                  key={i}
+                  aria-label={`תמונה ${i + 1}`}
+                  onClick={() => goTo(i, i > current ? 1 : -1)}
+                  className="transition-all duration-300"
+                  style={{
+                    width: i === current ? 24 : 6,
+                    height: 2,
+                    background:
+                      i === current ? "#c9a84c" : "rgba(255,255,255,0.2)",
+                    border: "none",
+                    padding: 0,
+                  }}
+                />
+              ))}
+            </div>
           </div>
 
-          {/* Counter */}
-          <span className="font-body text-muted" style={{ fontSize: 12, letterSpacing: "0.1em" }}>
-            {String(current + 1).padStart(2, "0")} / {String(photos.length).padStart(2, "0")}
-          </span>
-
-          {/* Arrows */}
-          <div className="flex gap-[10px]">
-            <button
-              aria-label="הקודם"
-              onClick={prev}
-              className="flex items-center justify-center transition-colors duration-200 hover:bg-gold-accent/12"
-              style={{
-                width: 40,
-                height: 40,
-                borderRadius: "50%",
-                border: "1px solid rgba(201,168,76,0.35)",
-                color: "#c9a84c",
-                background: "transparent",
-                fontSize: 20,
-              }}
-            >
-              ›
-            </button>
-            <button
-              aria-label="הבא"
-              onClick={next}
-              className="flex items-center justify-center transition-colors duration-200 hover:bg-gold-accent/12"
-              style={{
-                width: 40,
-                height: 40,
-                borderRadius: "50%",
-                border: "1px solid rgba(201,168,76,0.35)",
-                color: "#c9a84c",
-                background: "transparent",
-                fontSize: 20,
-              }}
-            >
-              ‹
-            </button>
-          </div>
+          {/* Next arrow */}
+          <button
+            aria-label="הבא"
+            onClick={next}
+            className="flex items-center justify-center transition-all hover:bg-gold-accent hover:text-black"
+            style={{
+              width: 48,
+              height: 48,
+              border: "1px solid rgba(201,168,76,0.4)",
+              color: "#c9a84c",
+              background: "transparent",
+              borderRadius: 0,
+            }}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <polyline points="15 18 9 12 15 6" />
+            </svg>
+          </button>
         </div>
 
-        {/* View all */}
-        <div className="text-center mt-8">
+        {/* View all CTA */}
+        <div className="text-center mt-14">
           <Link
             href="/gallery"
-            className="font-body text-muted hover:text-gold-accent transition-colors"
-            style={{ fontSize: 12, letterSpacing: "0.1em" }}
+            className="inline-flex items-center gap-3 font-label uppercase text-white/80 hover:text-gold-accent transition-colors"
+            style={{ fontSize: 12, fontWeight: 600, letterSpacing: "0.28em" }}
           >
-            לכל הגלריה →
+            <span>כל הגלריה</span>
+            <span aria-hidden>→</span>
           </Link>
         </div>
       </div>

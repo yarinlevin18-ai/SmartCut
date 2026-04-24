@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { motion, AnimatePresence } from "framer-motion";
 import { createClientBrowser } from "@/lib/supabase-browser";
 import { deleteService, getServices } from "@/lib/actions";
 import type { Service } from "@/types";
@@ -13,25 +14,24 @@ export default function ServicesPage() {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editingService, setEditingService] = useState<Service | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
 
   useEffect(() => {
+    const checkAuth = async (): Promise<void> => {
+      const supabase = createClientBrowser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user) {
+        router.push("/admin/login");
+        return;
+      }
+
+      await loadServices();
+    };
     checkAuth();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router]);
-
-  const checkAuth = async (): Promise<void> => {
-    const supabase = createClientBrowser();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      router.push("/admin/login");
-      return;
-    }
-
-    loadServices();
-  };
 
   const loadServices = async (): Promise<void> => {
     const result = await getServices();
@@ -40,118 +40,296 @@ export default function ServicesPage() {
   };
 
   const handleDelete = async (id: string): Promise<void> => {
-    if (!confirm("Are you sure you want to delete this service?")) return;
-
-    try {
-      const result = await deleteService(id);
-
-      if (!result.success) {
-        alert("Failed to delete service: " + result.error);
-        return;
-      }
-
-      setServices(services.filter((s) => s.id !== id));
-    } catch (err) {
-      alert("Failed to delete service");
+    const result = await deleteService(id);
+    setConfirmDelete(null);
+    if (!result.success) {
+      alert("Failed to delete service: " + result.error);
+      return;
     }
+    setServices(services.filter((s) => s.id !== id));
   };
 
-  const handleModalClose = () => {
+  const handleModalClose = async () => {
     setShowModal(false);
     setEditingService(null);
-    loadServices();
+    await loadServices();
   };
 
-  if (loading) {
-    return (
-      <div className="flex-1 p-8">
-        <p>Loading...</p>
-      </div>
-    );
-  }
-
   return (
-    <div className="flex-1 p-8">
-      <div className="flex justify-between items-center mb-8">
+    <div className="max-w-6xl">
+      {/* Header */}
+      <div className="flex items-start justify-between gap-4 mb-10 flex-wrap">
         <div>
-          <h1 className="text-4xl font-bold text-text mb-2">Services</h1>
-          <p className="text-muted">Manage your barber services</p>
+          <p
+            className="font-label uppercase text-gold-accent mb-3"
+            style={{
+              fontSize: 11,
+              fontWeight: 600,
+              letterSpacing: "0.36em",
+            }}
+          >
+            Services · שירותים
+          </p>
+          <h1
+            className="font-display text-white mb-2"
+            style={{ fontSize: "clamp(32px, 4.5vw, 48px)", lineHeight: 1.05 }}
+          >
+            ניהול שירותים
+          </h1>
+          <p
+            className="font-body text-white/55"
+            style={{ fontSize: 14, fontWeight: 300 }}
+          >
+            {services.length} שירותים פעילים
+          </p>
         </div>
         <button
           onClick={() => {
             setEditingService(null);
             setShowModal(true);
           }}
-          className="px-6 py-3 bg-gold text-dark font-semibold rounded hover:bg-gold-light transition-colors"
+          className="font-label uppercase transition-all duration-200 hover:bg-gold-light"
+          style={{
+            border: "1px solid #c9a84c",
+            color: "#000",
+            background: "#c9a84c",
+            fontSize: 11,
+            fontWeight: 700,
+            padding: "12px 28px",
+            borderRadius: 0,
+            letterSpacing: "0.28em",
+          }}
         >
-          Add Service
+          + שירות חדש
         </button>
       </div>
 
-      {services.length === 0 ? (
-        <div className="bg-surface border border-white/10 rounded-lg p-8 text-center">
-          <p className="text-muted mb-4">No services yet</p>
+      {/* List */}
+      {loading ? (
+        <div
+          className="py-16 text-center font-body text-white/40"
+          style={{ fontSize: 13 }}
+        >
+          טוען…
+        </div>
+      ) : services.length === 0 ? (
+        <div
+          className="p-12 text-center"
+          style={{
+            background: "#080808",
+            border: "1px solid rgba(201,168,76,0.12)",
+          }}
+        >
+          <p
+            className="font-body text-white/60 mb-5"
+            style={{ fontSize: 14, fontWeight: 300 }}
+          >
+            אין שירותים עדיין
+          </p>
           <button
             onClick={() => {
               setEditingService(null);
               setShowModal(true);
             }}
-            className="text-gold hover:text-gold-light transition-colors"
+            className="font-label uppercase text-gold-accent hover:text-gold-light transition-colors"
+            style={{
+              fontSize: 11,
+              fontWeight: 600,
+              letterSpacing: "0.28em",
+            }}
           >
-            Create your first service
+            צור שירות ראשון ←
           </button>
         </div>
       ) : (
-        <div className="bg-surface border border-white/10 rounded-lg overflow-hidden">
-          <div className="overflow-x-auto md:overflow-hidden">
-            <table className="min-w-full">
-            <thead className="bg-bg border-b border-white/10">
-              <tr>
-                <th className="px-6 py-4 text-sm font-medium text-muted">Name</th>
-                <th className="px-6 py-4 text-sm font-medium text-muted">Price (ILS)</th>
-                <th className="px-6 py-4 text-sm font-medium text-muted">Duration</th>
-                <th className="px-6 py-4 text-sm font-medium text-muted">Order</th>
-                <th className="px-6 py-4 text-sm font-medium text-muted">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-white/10">
-              {services.map((service) => (
-                <tr key={service.id} className="hover:bg-bg/50 transition-colors">
-                  <td className="px-6 py-4 text-text">{service.name}</td>
-                  <td className="px-6 py-4 text-text">₪{service.price}</td>
-                  <td className="px-6 py-4 text-text">{service.duration_minutes}m</td>
-                  <td className="px-6 py-4 text-text">{service.display_order}</td>
-                  <td className="px-6 py-4 text-sm space-x-3">
-                    <button
-                      onClick={() => {
-                        setEditingService(service);
-                        setShowModal(true);
+        <div
+          style={{
+            background: "#080808",
+            border: "1px solid rgba(201,168,76,0.12)",
+          }}
+        >
+          <ul className="divide-y divide-white/5">
+            {services.map((service) => (
+              <li
+                key={service.id}
+                className="p-6 md:p-7 flex items-center gap-5 hover:bg-white/[0.02] transition-colors"
+              >
+                {/* Order badge */}
+                <div
+                  className="shrink-0 w-10 h-10 flex items-center justify-center font-display text-gold-accent"
+                  style={{
+                    border: "1px solid rgba(201,168,76,0.25)",
+                    fontSize: 15,
+                  }}
+                >
+                  {service.display_order}
+                </div>
+
+                {/* Name + description */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-baseline gap-2 flex-wrap">
+                    <span
+                      className="font-display text-white"
+                      style={{ fontSize: 20, lineHeight: 1.2 }}
+                    >
+                      {service.name}
+                    </span>
+                    {service.duration_minutes ? (
+                      <span
+                        className="font-label uppercase text-white/40"
+                        style={{
+                          fontSize: 10,
+                          fontWeight: 600,
+                          letterSpacing: "0.28em",
+                        }}
+                      >
+                        · {service.duration_minutes} דק&apos;
+                      </span>
+                    ) : null}
+                  </div>
+                  {service.description && (
+                    <p
+                      className="font-body text-white/55 mt-2 line-clamp-2"
+                      style={{
+                        fontSize: 13,
+                        fontWeight: 300,
+                        lineHeight: 1.6,
                       }}
-                      className="text-gold hover:text-gold-light transition-colors"
                     >
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => handleDelete(service.id)}
-                      className="text-red-400 hover:text-red-300 transition-colors"
-                    >
-                      Delete
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-            </table>
-          </div>
+                      {service.description}
+                    </p>
+                  )}
+                </div>
+
+                {/* Price */}
+                <div
+                  className="shrink-0 font-display text-gold-accent"
+                  style={{ fontSize: 22 }}
+                >
+                  ₪{service.price}
+                </div>
+
+                {/* Actions */}
+                <div className="shrink-0 flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      setEditingService(service);
+                      setShowModal(true);
+                    }}
+                    aria-label="ערוך"
+                    className="font-label uppercase transition-all hover:bg-gold-accent hover:text-black"
+                    style={{
+                      border: "1px solid rgba(201,168,76,0.35)",
+                      color: "#c9a84c",
+                      background: "transparent",
+                      fontSize: 10,
+                      fontWeight: 600,
+                      padding: "8px 16px",
+                      borderRadius: 0,
+                      letterSpacing: "0.28em",
+                    }}
+                  >
+                    ערוך
+                  </button>
+                  <button
+                    onClick={() => setConfirmDelete(service.id)}
+                    aria-label="מחק"
+                    className="font-label uppercase transition-all hover:bg-red-500/10 hover:text-red-300"
+                    style={{
+                      border: "1px solid rgba(239,68,68,0.3)",
+                      color: "rgba(239,68,68,0.85)",
+                      background: "transparent",
+                      fontSize: 10,
+                      fontWeight: 600,
+                      padding: "8px 16px",
+                      borderRadius: 0,
+                      letterSpacing: "0.28em",
+                    }}
+                  >
+                    מחק
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
         </div>
       )}
 
-      {showModal && (
-        <ServiceModal
-          service={editingService}
-          onClose={handleModalClose}
-        />
-      )}
+      {/* Modal */}
+      <AnimatePresence>
+        {showModal && (
+          <ServiceModal service={editingService} onClose={handleModalClose} />
+        )}
+      </AnimatePresence>
+
+      {/* Confirm delete */}
+      <AnimatePresence>
+        {confirmDelete && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 px-6"
+            onClick={() => setConfirmDelete(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-[#0a0a0a] p-8 max-w-sm w-full"
+              style={{ border: "1px solid rgba(239,68,68,0.3)" }}
+            >
+              <h3
+                className="font-display text-white mb-3"
+                style={{ fontSize: 22 }}
+              >
+                מחיקת שירות
+              </h3>
+              <p
+                className="font-body text-white/60 mb-6"
+                style={{ fontSize: 13, fontWeight: 300, lineHeight: 1.7 }}
+              >
+                האם אתה בטוח? פעולה זו בלתי הפיכה.
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setConfirmDelete(null)}
+                  className="flex-1 font-label uppercase hover:bg-white/5 transition-all"
+                  style={{
+                    border: "1px solid rgba(255,255,255,0.2)",
+                    color: "rgba(255,255,255,0.85)",
+                    background: "transparent",
+                    fontSize: 11,
+                    fontWeight: 600,
+                    padding: "12px 16px",
+                    borderRadius: 0,
+                    letterSpacing: "0.24em",
+                  }}
+                >
+                  ביטול
+                </button>
+                <button
+                  onClick={() => handleDelete(confirmDelete)}
+                  className="flex-1 font-label uppercase transition-all hover:opacity-90"
+                  style={{
+                    border: "1px solid rgb(239,68,68)",
+                    color: "#fff",
+                    background: "rgb(220,38,38)",
+                    fontSize: 11,
+                    fontWeight: 700,
+                    padding: "12px 16px",
+                    borderRadius: 0,
+                    letterSpacing: "0.24em",
+                  }}
+                >
+                  מחק
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
