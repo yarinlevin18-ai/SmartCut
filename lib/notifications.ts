@@ -4,13 +4,11 @@ import { createServerAdmin } from "./supabase";
 import type { NotificationTemplate } from "@/types";
 
 const JERUSALEM_TZ = "Asia/Jerusalem";
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export type NotificationBookingContext = {
   booking_id: string;
   customer_name: string;
   phone: string; // E.164
-  email: string | null;
   slot_start: string; // ISO UTC
   slot_end: string; // ISO UTC
   service_name: string;
@@ -19,7 +17,7 @@ export type NotificationBookingContext = {
 
 type EnqueueRow = {
   booking_id: string;
-  channel: "email" | "sms";
+  channel: "sms";
   template: NotificationTemplate;
   recipient: string;
   locale: "he";
@@ -44,30 +42,30 @@ function reminderSendAt(slotStartIso: string): string {
 }
 
 /**
- * Enqueue confirmation (immediate) + reminder (slot_start - 24h) notifications
- * for a newly created booking. Never throws — failures are logged and swallowed
- * so booking creation is not blocked by the notifications pipeline.
+ * Enqueue confirmation (immediate) + reminder (slot_start - 24h) SMS for a
+ * newly created booking. Never throws — failures are logged and swallowed so
+ * booking creation is not blocked by the notifications pipeline.
  */
 export async function enqueueBookingCreated(
   ctx: NotificationBookingContext
 ): Promise<{ enqueued: number; skipped: string[] }> {
   const skipped: string[] = [];
-  const rows: EnqueueRow[] = [];
   const now = new Date().toISOString();
   const reminderAt = reminderSendAt(ctx.slot_start);
   const reminderIsFuture = new Date(reminderAt).getTime() > Date.now();
   const payload = buildPayload(ctx);
 
-  // SMS — recipient is always the phone (validated E.164 upstream)
-  rows.push({
-    booking_id: ctx.booking_id,
-    channel: "sms",
-    template: "booking_confirmed",
-    recipient: ctx.phone,
-    locale: "he",
-    payload,
-    scheduled_for: now,
-  });
+  const rows: EnqueueRow[] = [
+    {
+      booking_id: ctx.booking_id,
+      channel: "sms",
+      template: "booking_confirmed",
+      recipient: ctx.phone,
+      locale: "he",
+      payload,
+      scheduled_for: now,
+    },
+  ];
   if (reminderIsFuture) {
     rows.push({
       booking_id: ctx.booking_id,
@@ -80,32 +78,6 @@ export async function enqueueBookingCreated(
     });
   } else {
     skipped.push("sms_reminder:slot_within_24h");
-  }
-
-  // Email — only if customer supplied a valid-looking address
-  if (ctx.email && EMAIL_RE.test(ctx.email)) {
-    rows.push({
-      booking_id: ctx.booking_id,
-      channel: "email",
-      template: "booking_confirmed",
-      recipient: ctx.email,
-      locale: "he",
-      payload,
-      scheduled_for: now,
-    });
-    if (reminderIsFuture) {
-      rows.push({
-        booking_id: ctx.booking_id,
-        channel: "email",
-        template: "booking_reminder_24h",
-        recipient: ctx.email,
-        locale: "he",
-        payload,
-        scheduled_for: reminderAt,
-      });
-    }
-  } else {
-    skipped.push("email:no_address");
   }
 
   try {
@@ -123,8 +95,8 @@ export async function enqueueBookingCreated(
 }
 
 /**
- * On cancellation: enqueue a cancellation notice (immediate) AND mark any
- * still-queued reminders for this booking as 'skipped' so they don't fire.
+ * On cancellation: enqueue a cancellation SMS (immediate) AND mark any still-queued
+ * reminders for this booking as 'skipped' so they don't fire.
  */
 export async function enqueueBookingCancelled(
   ctx: NotificationBookingContext
@@ -142,17 +114,6 @@ export async function enqueueBookingCancelled(
       scheduled_for: now,
     },
   ];
-  if (ctx.email && EMAIL_RE.test(ctx.email)) {
-    rows.push({
-      booking_id: ctx.booking_id,
-      channel: "email",
-      template: "booking_cancelled",
-      recipient: ctx.email,
-      locale: "he",
-      payload,
-      scheduled_for: now,
-    });
-  }
 
   try {
     const admin = createServerAdmin();

@@ -84,12 +84,12 @@ export interface BlockedDate {
   created_at: string;
 }
 
-export type NotificationChannel = "email" | "sms";
+export type NotificationChannel = "sms";
 export type NotificationTemplate =
   | "booking_confirmed"
   | "booking_cancelled"
   | "booking_reminder_24h";
-export type NotificationStatus = "queued" | "sent" | "failed" | "skipped";
+export type NotificationStatus = "queued" | "sending" | "sent" | "failed" | "skipped";
 export type NotificationLocale = "he" | "en";
 
 export interface Notification {

@@ -10,12 +10,13 @@
 Phase 1 landed a slot-based booking system. Customers submit a booking and get a silent database insert — no confirmation, no reminder, no cancellation notice. Wix handled all of this before and we ripped it out.
 
 Requirements:
-- **Confirmation** on successful `createBooking` (email + SMS).
-- **24h reminder** before `slot_start` (email + SMS).
-- **Cancellation notice** when an admin cancels a booking (email + SMS).
+- **Confirmation** on successful `createBooking` (SMS).
+- **24h reminder** before `slot_start` (SMS).
+- **Cancellation notice** when an admin cancels a booking (SMS).
 - **Hebrew-first** templates; English fallback later.
 - **Auditable**: every send attempt logged, retryable, visible to admins.
 - **Resilient**: a flaky provider does not break booking creation.
+- **SMS-only for now.** Email was cut from Phase 2 scope (customers don't need it, reduces provider surface and costs).
 
 ## Decisions
 
@@ -31,8 +32,8 @@ Requirements:
 **Why:** Decouples user-facing latency from provider latency. Also lets us retry failed sends without re-running the trigger.
 
 ### D3. Providers
-- **Email:** Resend (`resend` npm package). 3k/month free tier, simple API, good deliverability, Hebrew RTL-safe HTML bodies.
-- **SMS:** Inforu (Israeli provider, ~0.08₪/SMS, Hebrew support, requires sender-ID approval). Adapter is isolated behind an `SmsProvider` interface so we can swap to 019mobile or Twilio without touching trigger code.
+- **SMS:** TBD (Inforu / 019mobile / Twilio). Adapter is isolated behind an `SmsProvider` interface so we can swap without touching trigger code.
+- **Email:** deferred. Not in Phase 2 scope.
 
 ### D4. Template variables snapshotted at enqueue
 `notifications.payload` (JSONB) captures `customer_name`, `slot_start_local`, `service_name`, `duration_minutes`, `shop_phone`, `shop_address`, `manage_url` at enqueue time. The worker reads the payload, not the current `bookings` row.

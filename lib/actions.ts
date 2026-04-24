@@ -643,7 +643,6 @@ export async function createBooking(
     booking_id: booking.id,
     customer_name: booking.full_name,
     phone,
-    email: booking.email,
     slot_start: slotStartIso,
     slot_end: slotEndIso,
     service_name: serviceName,
@@ -695,7 +694,7 @@ export async function cancelBooking(id: string): Promise<ServerActionResult> {
       .update({ status: "cancelled" })
       .eq("id", id)
       .neq("status", "cancelled")
-      .select("id, full_name, phone, email, slot_start, slot_end, service_id, services(name, duration_minutes)")
+      .select("id, full_name, phone, slot_start, slot_end, service_id, services(name, duration_minutes)")
       .single();
 
     if (error) throw error;
@@ -707,7 +706,6 @@ export async function cancelBooking(id: string): Promise<ServerActionResult> {
         booking_id: data.id,
         customer_name: data.full_name,
         phone: data.phone,
-        email: data.email ?? null,
         slot_start: data.slot_start,
         slot_end: data.slot_end,
         service_name: (svc?.name as string | undefined) ?? "",

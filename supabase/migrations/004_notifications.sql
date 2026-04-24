@@ -10,11 +10,11 @@
 CREATE TABLE IF NOT EXISTS notifications (
   id                   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   booking_id           UUID NULL REFERENCES bookings(id) ON DELETE SET NULL,
-  channel              TEXT NOT NULL CHECK (channel IN ('email','sms')),
+  channel              TEXT NOT NULL CHECK (channel IN ('sms')),
   template             TEXT NOT NULL CHECK (template IN ('booking_confirmed','booking_cancelled','booking_reminder_24h')),
   recipient            TEXT NOT NULL,                 -- email address or E.164 phone
   locale               TEXT NOT NULL DEFAULT 'he' CHECK (locale IN ('he','en')),
-  status               TEXT NOT NULL DEFAULT 'queued' CHECK (status IN ('queued','sent','failed','skipped')),
+  status               TEXT NOT NULL DEFAULT 'queued' CHECK (status IN ('queued','sending','sent','failed','skipped')),
   attempts             SMALLINT NOT NULL DEFAULT 0 CHECK (attempts >= 0 AND attempts <= 5),
   provider             TEXT NULL,                     -- e.g. 'resend', 'inforu', '019mobile'
   provider_message_id  TEXT NULL,                     -- set once provider accepts
