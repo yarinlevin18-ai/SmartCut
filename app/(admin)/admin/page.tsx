@@ -6,8 +6,41 @@ import { getGcalStatus, listUpcomingEvents, getPrimaryCalendarId } from "@/lib/g
 import { GcalPanel } from "./GcalPanel";
 import { TodaySchedule } from "./TodaySchedule";
 import { CalendarView } from "./CalendarView";
+import type { User } from "@supabase/supabase-js";
 
 export const dynamic = "force-dynamic";
+
+/**
+ * Pick a Hebrew display name for the dashboard greeting. Order of preference:
+ *   1. user_metadata.first_name_he  — explicit Hebrew first name
+ *   2. user_metadata.full_name_he   — explicit Hebrew full name
+ *   3. user_metadata.first_name     — generic display name
+ *   4. user_metadata.name           — generic display name (Supabase default key)
+ *   5. EMAIL_TO_HE_FALLBACK[email]  — known studio owners (env-free baseline)
+ *   6. email-prefix                 — last resort, never blank
+ *
+ * To set a Hebrew name in production:
+ *   Supabase Dashboard → Authentication → Users → click user → Edit →
+ *   Raw user metadata → add { "first_name_he": "ירין" }.
+ */
+const EMAIL_TO_HE_FALLBACK: Record<string, string> = {
+  "yarinlevin18@gmail.com": "ירין",
+};
+
+function displayName(user: User): string {
+  const meta = (user.user_metadata ?? {}) as Record<string, unknown>;
+  const fromMeta =
+    (typeof meta.first_name_he === "string" && meta.first_name_he) ||
+    (typeof meta.full_name_he === "string" && meta.full_name_he) ||
+    (typeof meta.first_name === "string" && meta.first_name) ||
+    (typeof meta.name === "string" && meta.name);
+  if (fromMeta) return fromMeta as string;
+
+  const email = user.email ?? "";
+  if (EMAIL_TO_HE_FALLBACK[email]) return EMAIL_TO_HE_FALLBACK[email];
+
+  return email.split("@")[0] || "אדמין";
+}
 
 export default async function AdminPage() {
   const supabase = await createClient();
@@ -57,14 +90,8 @@ export default async function AdminPage() {
             lineHeight: 1.05,
           }}
         >
-          שלום, <span className="text-gold-accent">{user.email?.split("@")[0]}</span>
+          שלום, <span className="text-gold-accent">{displayName(user)}</span>
         </h1>
-        <p
-          className="font-body text-white/55"
-          style={{ fontSize: 15, fontWeight: 300 }}
-        >
-          ברוך הבא לניהול קרמליס סטודיו
-        </p>
       </div>
 
       {/* Today's schedule — primary daily-driver view (DB-backed). */}
