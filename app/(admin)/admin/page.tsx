@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase";
 import { getBookings } from "@/lib/actions";
-import { getGcalStatus, listUpcomingEvents } from "@/lib/gcal";
+import { getGcalStatus, listUpcomingEvents, getPrimaryCalendarId } from "@/lib/gcal";
 import { GcalPanel } from "./GcalPanel";
 import { TodaySchedule } from "./TodaySchedule";
 import { CalendarView } from "./CalendarView";
@@ -25,12 +25,12 @@ export default async function AdminPage() {
     getGcalStatus(),
   ]);
 
-  // Fetch upcoming Google Calendar events only when connected — avoids a
-  // pointless API call on every dashboard render for accounts that haven't
+  // Fetch the calendar surface in parallel — only when connected, to avoid
+  // pointless API calls on every dashboard render for accounts that haven't
   // wired the integration yet.
-  const upcomingEvents = gcalStatus.connected
-    ? await listUpcomingEvents(7, 50)
-    : null;
+  const [upcomingEvents, calendarId] = gcalStatus.connected
+    ? await Promise.all([listUpcomingEvents(7, 50), getPrimaryCalendarId()])
+    : [null, null];
 
   const bookings =
     bookingsRes.success && bookingsRes.data ? bookingsRes.data : [];
@@ -78,7 +78,11 @@ export default async function AdminPage() {
       />
 
       {/* Next 7 days from Google Calendar — only renders when connected. */}
-      <CalendarView events={upcomingEvents} connected={gcalStatus.connected} />
+      <CalendarView
+        events={upcomingEvents}
+        calendarId={calendarId}
+        connected={gcalStatus.connected}
+      />
 
       {/* Recent bookings */}
       <div

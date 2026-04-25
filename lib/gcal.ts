@@ -392,6 +392,41 @@ interface GcalListResponse {
 }
 
 /**
+ * Resolve the connected calendar's id (typically the user's email address
+ * for "primary"). Used as the `src=` parameter for the Google Calendar
+ * embed iframe — `primary` is an alias only the API understands; the iframe
+ * needs the explicit id.
+ *
+ * Returns null on disconnect / error.
+ */
+export async function getPrimaryCalendarId(): Promise<string | null> {
+  try {
+    const tok = await getOrRefreshAccessToken();
+    if (!tok) return null;
+
+    // If admin already chose a non-primary calendar, return that directly —
+    // it's already a concrete id.
+    if (tok.calendarId && tok.calendarId !== "primary") return tok.calendarId;
+
+    const url = `${CALENDAR_API_BASE}/${encodeURIComponent(tok.calendarId)}`;
+    const res = await fetch(url, {
+      headers: { Authorization: `Bearer ${tok.accessToken}` },
+      cache: "no-store",
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      console.error("[gcal] getPrimaryCalendarId failed", res.status, text.slice(0, 200));
+      return null;
+    }
+    const data = (await res.json()) as { id?: string };
+    return data.id ?? null;
+  } catch (err) {
+    console.error("[gcal] getPrimaryCalendarId threw", err instanceof Error ? err.message : err);
+    return null;
+  }
+}
+
+/**
  * Fetch upcoming events from the connected calendar. Returns up to `maxResults`
  * events between now and now + `daysAhead` days, expanded (recurring events
  * become individual instances), ordered by start time. Returns null if

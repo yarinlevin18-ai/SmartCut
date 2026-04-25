@@ -5,34 +5,116 @@ const JERUSALEM_TZ = "Asia/Jerusalem";
 
 interface CalendarViewProps {
   events: GcalEventSummary[] | null;
-  /** Falsy if the integration isn't configured — caller decides whether to render at all. */
+  /** Calendar id for the iframe src — the user's email when primary calendar is connected. */
+  calendarId: string | null;
+  /** Falsy if the integration isn't configured. Caller decides whether to render at all. */
   connected: boolean;
 }
 
 /**
- * "Next 7 days" Google Calendar view, grouped by date. Reads from the
- * Google Calendar API (not our DB) so it includes the barber's external
- * events (haircuts at someone else's place, vacation blocks, dentist…)
- * alongside the SmartCut bookings we mirrored over.
- *
- * Rendered as a server component — events are fetched server-side at
- * /admin pageload and passed in.
+ * Two-tier Google Calendar surface inside the dashboard:
+ *   1. EMBEDDED IFRAME (top) — the real Google Calendar UI showing ALL events
+ *      from ALL the user's calendars. Only works when the viewer is signed
+ *      into Google with the connected account in the same browser session
+ *      (which is true for the studio owner's normal admin workflow).
+ *   2. UPCOMING-EVENTS LIST (below) — fetched server-side via the Calendar
+ *      API. Acts as fallback (e.g. if iframe is blocked / signed out) plus
+ *      gives a compact "next 7 days" summary regardless.
  */
-export function CalendarView({ events, connected }: CalendarViewProps) {
-  if (!connected) {
-    // Caller already shows the "Connect" UI in GcalPanel — don't duplicate here.
-    return null;
+export function CalendarView({ events, calendarId, connected }: CalendarViewProps) {
+  if (!connected) return null;
+
+  return (
+    <div className="mb-12 space-y-6">
+      <Embed calendarId={calendarId} />
+      <Upcoming events={events} />
+    </div>
+  );
+}
+
+// ---- iframe section ----
+
+function Embed({ calendarId }: { calendarId: string | null }) {
+  if (!calendarId) {
+    return (
+      <Shell title="היומן שלך · Your Calendar">
+        <p
+          className="font-body text-white/55 px-6 md:px-8 py-8 text-center"
+          style={{ fontSize: 13, fontWeight: 300, lineHeight: 1.7 }}
+        >
+          לא הצלחנו לזהות את כתובת היומן. נסה לנתק ולחבר מחדש את החשבון.
+        </p>
+      </Shell>
+    );
   }
 
+  // Build the embed URL. We pass minimal chrome flags so the iframe focuses
+  // on the calendar grid: hide title bar, print button, calendar list, and
+  // tabs the user can't act on inside an iframe.
+  const params = new URLSearchParams({
+    src: calendarId,
+    ctz: JERUSALEM_TZ,
+    mode: "WEEK",
+    showTitle: "0",
+    showPrint: "0",
+    showCalendars: "0",
+    showTabs: "1",
+    showDate: "1",
+    showNav: "1",
+    bgcolor: "%230d0d0d",
+  });
+  const embedUrl = `https://calendar.google.com/calendar/embed?${params.toString()}`;
+
+  return (
+    <Shell
+      title="היומן שלך · Your Calendar"
+      subtitle="כל האירועים מכל היומנים שלך — מוטמע ישירות מ-Google."
+    >
+      <div
+        className="px-3 md:px-4 pb-4"
+        style={{ background: "#0d0d0d" }}
+      >
+        <iframe
+          src={embedUrl}
+          // 720 keeps a full week visible without scroll on most desktops.
+          // Mobile gets aspect-ratio 4/5 fallback further down via CSS.
+          style={{
+            border: 0,
+            width: "100%",
+            height: 720,
+            background: "#0d0d0d",
+            colorScheme: "normal",
+          }}
+          frameBorder={0}
+          scrolling="no"
+          title="Google Calendar embed"
+        />
+        <p
+          className="font-body text-white/35 mt-3 text-center"
+          style={{ fontSize: 11, fontWeight: 300, lineHeight: 1.7 }}
+        >
+          אם היומן לא נטען, ודא שאתה מחובר ל-Google בדפדפן עם החשבון{" "}
+          <span dir="ltr" className="text-white/55">
+            {calendarId}
+          </span>
+          .
+        </p>
+      </div>
+    </Shell>
+  );
+}
+
+// ---- upcoming list section (compact) ----
+
+function Upcoming({ events }: { events: GcalEventSummary[] | null }) {
   if (events === null) {
-    // API error / token expired / network failure.
     return (
       <Shell title="הימים הקרובים · Next 7 days">
         <p
           className="font-body text-white/55 px-6 md:px-8 py-8 text-center"
           style={{ fontSize: 13, fontWeight: 300 }}
         >
-          לא הצלחנו לטעון את היומן כרגע. נסה לרענן או לחבר מחדש את החשבון.
+          לא הצלחנו לטעון את רשימת האירועים.
         </p>
       </Shell>
     );
@@ -48,12 +130,6 @@ export function CalendarView({ events, connected }: CalendarViewProps) {
           >
             אין אירועים מתוזמנים בשבוע הקרוב.
           </p>
-          <p
-            className="font-body text-white/30 mt-2"
-            style={{ fontSize: 12, fontWeight: 300 }}
-          >
-            תורים שיאושרו דרך המערכת יופיעו כאן אוטומטית.
-          </p>
         </div>
       </Shell>
     );
@@ -68,7 +144,6 @@ export function CalendarView({ events, connected }: CalendarViewProps) {
     else groups.set(key, [e]);
   }
   const dates = Array.from(groups.keys()).sort();
-
   const todayKey = formatInTimeZone(new Date(), JERUSALEM_TZ, "yyyy-MM-dd");
   const tomorrowKey = formatInTimeZone(
     new Date(Date.now() + 24 * 3600_000),
@@ -81,24 +156,19 @@ export function CalendarView({ events, connected }: CalendarViewProps) {
       <ul className="divide-y divide-white/5">
         {dates.map((dateKey) => {
           const dayEvents = groups.get(dateKey) ?? [];
-          // Use UTC noon of that date so DST edges don't drift the parsed value.
           const dateForLabel = new Date(`${dateKey}T12:00:00Z`);
           const weekday = formatInTimeZone(dateForLabel, JERUSALEM_TZ, "EEEE");
           const dayMonth = formatInTimeZone(dateForLabel, JERUSALEM_TZ, "dd/MM");
           const isToday = dateKey === todayKey;
           const isTomorrow = dateKey === tomorrowKey;
-          const dayTag = isToday
-            ? "היום"
-            : isTomorrow
-              ? "מחר"
-              : weekday;
+          const dayTag = isToday ? "היום" : isTomorrow ? "מחר" : weekday;
 
           return (
             <li key={dateKey} className="px-5 md:px-7 py-5">
               <div className="flex items-baseline gap-3 mb-3 flex-wrap">
                 <span
                   className="font-display text-white"
-                  style={{ fontSize: 18, lineHeight: 1.1 }}
+                  style={{ fontSize: 17, lineHeight: 1.1 }}
                 >
                   {dayTag}
                 </span>
@@ -145,12 +215,8 @@ export function CalendarView({ events, connected }: CalendarViewProps) {
 
 function EventRow({ event }: { event: GcalEventSummary }) {
   const isAllDay = event.isAllDay;
-  const start = isAllDay
-    ? null
-    : formatInTimeZone(event.start, JERUSALEM_TZ, "HH:mm");
-  const end = isAllDay
-    ? null
-    : formatInTimeZone(event.end, JERUSALEM_TZ, "HH:mm");
+  const start = isAllDay ? null : formatInTimeZone(event.start, JERUSALEM_TZ, "HH:mm");
+  const end = isAllDay ? null : formatInTimeZone(event.end, JERUSALEM_TZ, "HH:mm");
 
   return (
     <li
@@ -160,26 +226,19 @@ function EventRow({ event }: { event: GcalEventSummary }) {
         border: "1px solid rgba(255,255,255,0.04)",
       }}
     >
-      {/* Time block */}
       <div
         className="shrink-0 flex flex-col items-center justify-center"
         style={{
           minWidth: 64,
           padding: "6px 10px",
-          background: isAllDay
-            ? "rgba(201,168,76,0.04)"
-            : "rgba(201,168,76,0.06)",
+          background: isAllDay ? "rgba(201,168,76,0.04)" : "rgba(201,168,76,0.06)",
           border: "1px solid rgba(201,168,76,0.18)",
         }}
       >
         {isAllDay ? (
           <span
             className="font-label uppercase text-white/55"
-            style={{
-              fontSize: 9,
-              fontWeight: 700,
-              letterSpacing: "0.2em",
-            }}
+            style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.2em" }}
           >
             יום שלם
           </span>
@@ -203,7 +262,6 @@ function EventRow({ event }: { event: GcalEventSummary }) {
         )}
       </div>
 
-      {/* Event body */}
       <div className="flex-1 min-w-0">
         <div
           className="font-body text-white/90 truncate"
@@ -239,18 +297,21 @@ function EventRow({ event }: { event: GcalEventSummary }) {
   );
 }
 
+// ---- shared shell ----
+
 function Shell({
   title,
+  subtitle,
   count,
   children,
 }: {
   title: string;
+  subtitle?: string;
   count?: number;
   children: React.ReactNode;
 }) {
   return (
     <div
-      className="mb-12"
       style={{
         background: "#080808",
         border: "1px solid rgba(201,168,76,0.15)",
@@ -273,6 +334,14 @@ function Shell({
           >
             {title}
           </h2>
+          {subtitle && (
+            <p
+              className="font-body text-white/45 mt-1"
+              style={{ fontSize: 12, fontWeight: 300, lineHeight: 1.6 }}
+            >
+              {subtitle}
+            </p>
+          )}
         </div>
         {count !== undefined && count > 0 && (
           <span
