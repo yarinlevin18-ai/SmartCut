@@ -7,6 +7,7 @@ import { GcalPanel } from "./GcalPanel";
 import { TodaySchedule } from "./TodaySchedule";
 import { BookingsCalendar } from "./BookingsCalendar";
 import { PendingRequests } from "./PendingRequests";
+import { AutoRefresh } from "./AutoRefresh";
 import type { User } from "@supabase/supabase-js";
 
 export const dynamic = "force-dynamic";
@@ -87,6 +88,10 @@ export default async function AdminPage() {
           שלום, <span className="text-gold-accent">{displayName(user)}</span>
         </h1>
       </div>
+
+      {/* Auto-refresh: silently re-fetches every 30s so new pending
+          requests appear without the admin hitting reload. */}
+      <AutoRefresh intervalMs={30_000} />
 
       {/* Pending requests — top priority, only renders when there's
           something to act on. Renders nothing when the queue is empty. */}
