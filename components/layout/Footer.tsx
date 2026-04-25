@@ -231,6 +231,33 @@ export function Footer() {
             Shaving &amp; Grooming Specialists
           </span>
         </div>
+
+        {/* Software credit + legal ownership notice */}
+        <div className="mt-6 pt-6 border-t border-white/5 flex flex-col md:flex-row items-center justify-center gap-2 text-center">
+          <span
+            className="font-label uppercase text-white/30"
+            style={{
+              fontSize: 9,
+              fontWeight: 500,
+              letterSpacing: "0.32em",
+            }}
+          >
+            Designed &amp; Developed by Yarin Levin
+          </span>
+          <span className="text-white/20 hidden md:inline" aria-hidden>
+            ·
+          </span>
+          <span
+            className="font-label uppercase text-white/30"
+            style={{
+              fontSize: 9,
+              fontWeight: 500,
+              letterSpacing: "0.32em",
+            }}
+          >
+            &copy; {new Date().getFullYear()} Yarin Levin · All rights reserved
+          </span>
+        </div>
       </div>
     </footer>
   );
