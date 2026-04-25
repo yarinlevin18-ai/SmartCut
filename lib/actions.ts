@@ -4,12 +4,20 @@ import { revalidatePath, revalidateTag, unstable_cache } from "next/cache";
 import { formatInTimeZone } from "date-fns-tz";
 import { createClient, createAnonClient, createServerAdmin } from "./supabase";
 import { requireAdmin } from "./auth";
-import { enqueueBookingCreated, enqueueBookingCancelled, enqueueBookingRescheduled } from "./notifications";
+import {
+  enqueueBookingCancelled,
+  enqueueBookingRescheduled,
+  enqueueBookingPending,
+  enqueueBookingApproved,
+  enqueueBookingDenied,
+  enqueueBookingAlternativeOffered,
+} from "./notifications";
 import type {
   Service,
   GalleryPhoto,
   Booking,
   BookingInput,
+  BookingStatus,
   ServerActionResult,
   AvailabilityConfigRow,
   BlockedDate,
@@ -618,7 +626,10 @@ export async function createBooking(
         service_id: input.service_id,
         slot_start: slotStartIso,
         slot_end: slotEndIso,
-        status: "confirmed",
+        // Phase 5: bookings arrive as pending and require admin approval.
+        // The 24h-reminder is enqueued only on approval (see approveBooking),
+        // so a denied/rescheduled booking never sends a stale reminder.
+        status: "pending",
         barber_id: null,
         preferred_date,
         preferred_time,
@@ -642,7 +653,7 @@ export async function createBooking(
   const booking = data as Booking;
 
   // Fire-and-forget: never block booking success on the notifications pipeline.
-  await enqueueBookingCreated({
+  await enqueueBookingPending({
     booking_id: booking.id,
     customer_name: booking.full_name,
     phone,
@@ -727,6 +738,182 @@ export async function cancelBooking(id: string): Promise<ServerActionResult> {
   }
 }
 
+// ============================================================================
+// PHASE 5 — APPROVAL WORKFLOW (admin actions)
+// ============================================================================
+
+/**
+ * Admin approves a pending booking: status pending → confirmed.
+ * Enqueues the approval SMS + 24h reminder. The GIST exclusion catches
+ * any concurrent collision (another pending booking that grabbed the slot
+ * first and got approved before us) — surfaced as SLOT_TAKEN.
+ */
+export async function approveBooking(id: string): Promise<ServerActionResult> {
+  try {
+    await requireAdmin();
+    if (!UUID_RE.test(id)) return { success: false, error: "Invalid booking id" };
+    const supabase = createServerAdmin();
+
+    const { data, error } = await supabase
+      .from("bookings")
+      .update({ status: "confirmed", alt_offered_at: null })
+      .eq("id", id)
+      .eq("status", "pending")
+      .select(
+        "id, full_name, phone, slot_start, slot_end, service_id, manage_token, services(name, duration_minutes)",
+      )
+      .single();
+
+    if (error) {
+      if (error.code === "23P01") return { success: false, error: "SLOT_TAKEN" };
+      return { success: false, error: error.message };
+    }
+    if (!data) return { success: false, error: "Booking not pending or not found" };
+
+    const svc = Array.isArray(data.services) ? data.services[0] : data.services;
+    if (data.slot_start && data.slot_end && data.phone) {
+      await enqueueBookingApproved({
+        booking_id: data.id,
+        customer_name: data.full_name,
+        phone: data.phone,
+        slot_start: data.slot_start,
+        slot_end: data.slot_end,
+        service_name: (svc?.name as string | undefined) ?? "",
+        duration_minutes: (svc?.duration_minutes as number | undefined) ?? 0,
+        manage_token: data.manage_token as string,
+      });
+    }
+
+    revalidatePath("/admin/bookings");
+    revalidatePath("/admin/notifications");
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : "Failed to approve" };
+  }
+}
+
+export type DenyMode =
+  | { mode: "reject" }
+  | { mode: "alternative"; new_slot_start: string };
+
+/**
+ * Admin denies a pending booking. Two modes:
+ *  - reject: status pending → denied, single denial SMS.
+ *  - alternative: keep status='pending' but rewrite slot_start/slot_end + set
+ *    alt_offered_at = now(). SMS to customer with the new slot details and
+ *    a manage URL that opens the customer-confirm UI.
+ *
+ * Both modes skip any queued booking_pending ack (the customer is about to
+ * receive a more specific message).
+ */
+export async function denyBooking(
+  id: string,
+  options: DenyMode,
+): Promise<ServerActionResult> {
+  try {
+    await requireAdmin();
+    if (!UUID_RE.test(id)) return { success: false, error: "Invalid booking id" };
+    const supabase = createServerAdmin();
+
+    if (options.mode === "reject") {
+      const { data, error } = await supabase
+        .from("bookings")
+        .update({ status: "denied", alt_offered_at: null })
+        .eq("id", id)
+        .eq("status", "pending")
+        .select(
+          "id, full_name, phone, slot_start, slot_end, service_id, manage_token, services(name, duration_minutes)",
+        )
+        .single();
+
+      if (error) return { success: false, error: error.message };
+      if (!data) return { success: false, error: "Booking not pending or not found" };
+
+      const svc = Array.isArray(data.services) ? data.services[0] : data.services;
+      if (data.slot_start && data.slot_end && data.phone) {
+        await enqueueBookingDenied({
+          booking_id: data.id,
+          customer_name: data.full_name,
+          phone: data.phone,
+          slot_start: data.slot_start,
+          slot_end: data.slot_end,
+          service_name: (svc?.name as string | undefined) ?? "",
+          duration_minutes: (svc?.duration_minutes as number | undefined) ?? 0,
+          manage_token: data.manage_token as string,
+        });
+      }
+
+      revalidatePath("/admin/bookings");
+      revalidatePath("/admin/notifications");
+      return { success: true };
+    }
+
+    // mode === "alternative"
+    const newSlotStart = new Date(options.new_slot_start);
+    if (Number.isNaN(newSlotStart.getTime())) {
+      return { success: false, error: "Invalid new_slot_start" };
+    }
+    if (newSlotStart.getTime() - Date.now() < 24 * 3600_000) {
+      return { success: false, error: "NEW_SLOT_TOO_SOON" };
+    }
+    // 15-minute grid alignment.
+    if (newSlotStart.getTime() % (15 * 60_000) !== 0) {
+      return { success: false, error: "INVALID_SLOT" };
+    }
+
+    // Need service.duration to compute new_slot_end.
+    const cur = await supabase
+      .from("bookings")
+      .select("id, status, service_id, full_name, phone, manage_token, services(name, duration_minutes)")
+      .eq("id", id)
+      .single();
+    if (cur.error || !cur.data) return { success: false, error: cur.error?.message ?? "Not found" };
+    if (cur.data.status !== "pending") {
+      return { success: false, error: "Booking not pending" };
+    }
+    const svc = Array.isArray(cur.data.services) ? cur.data.services[0] : cur.data.services;
+    const duration = (svc?.duration_minutes as number | undefined) ?? 0;
+    if (!duration) return { success: false, error: "Service has no duration" };
+    const newSlotEnd = new Date(newSlotStart.getTime() + duration * 60_000);
+
+    // Atomic mutation. The GIST exclusion will catch a slot that's been taken
+    // by another booking since the admin opened the modal.
+    const upd = await supabase
+      .from("bookings")
+      .update({
+        slot_start: newSlotStart.toISOString(),
+        slot_end: newSlotEnd.toISOString(),
+        alt_offered_at: new Date().toISOString(),
+      })
+      .eq("id", id)
+      .eq("status", "pending")
+      .select("id");
+    if (upd.error) {
+      if (upd.error.code === "23P01") return { success: false, error: "SLOT_TAKEN" };
+      return { success: false, error: upd.error.message };
+    }
+
+    if (cur.data.phone) {
+      await enqueueBookingAlternativeOffered({
+        booking_id: cur.data.id,
+        customer_name: cur.data.full_name,
+        phone: cur.data.phone,
+        slot_start: newSlotStart.toISOString(),
+        slot_end: newSlotEnd.toISOString(),
+        service_name: (svc?.name as string | undefined) ?? "",
+        duration_minutes: duration,
+        manage_token: cur.data.manage_token as string,
+      });
+    }
+
+    revalidatePath("/admin/bookings");
+    revalidatePath("/admin/notifications");
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : "Failed to deny" };
+  }
+}
+
 /**
  * @deprecated use cancelBooking. Kept as an alias so existing callers keep
  * working during the transition; the action now soft-cancels instead of deleting.
@@ -748,7 +935,9 @@ export type ManageBookingView = {
   slot_end: string | null;
   service_id: string | null;
   service_name: string | null;
-  status: "confirmed" | "cancelled" | "completed" | "no_show";
+  status: BookingStatus;
+  /** Set when admin offered an alternative slot for a pending booking. */
+  alt_offered_at: string | null;
 };
 
 export type CancelByTokenStatus =
@@ -920,6 +1109,89 @@ export async function rescheduleBookingByToken(
     new_slot_start: result.new_slot_start,
     new_slot_end: result.new_slot_end,
   };
+}
+
+export type ConfirmAlternativeStatus =
+  | "ok"
+  | "not_found"
+  | "not_pending"
+  | "slot_in_past"
+  | "too_late"
+  | "slot_unavailable";
+
+/**
+ * Customer-facing accept/cancel of an admin-suggested alternative slot.
+ * Calls customer_confirm_alternative_by_token RPC. On 'ok' + accept,
+ * enqueues booking_approved (with reminder). On 'ok' + cancel, enqueues
+ * booking_cancelled.
+ */
+export async function customerConfirmAlternativeByToken(
+  token: string,
+  decision: "accept" | "cancel",
+): Promise<{ status: ConfirmAlternativeStatus }> {
+  if (!UUID_RE.test(token)) return { status: "not_found" };
+  if (decision !== "accept" && decision !== "cancel") {
+    return { status: "not_pending" };
+  }
+
+  const supabase = createAnonClient();
+  const { data, error } = await supabase
+    .rpc("customer_confirm_alternative_by_token", {
+      p_token: token,
+      p_decision: decision,
+    })
+    .maybeSingle();
+
+  if (error || !data) return { status: "not_found" };
+
+  const result = data as {
+    status: ConfirmAlternativeStatus;
+    booking_id: string | null;
+    slot_start: string | null;
+    slot_end: string | null;
+    service_id: string | null;
+    full_name: string | null;
+    phone: string | null;
+  };
+
+  if (
+    result.status === "ok" &&
+    result.booking_id &&
+    result.slot_start &&
+    result.slot_end &&
+    result.phone
+  ) {
+    const admin = createServerAdmin();
+    const { data: svc } = result.service_id
+      ? await admin
+          .from("services")
+          .select("name, duration_minutes")
+          .eq("id", result.service_id)
+          .maybeSingle()
+      : { data: null as { name: string; duration_minutes: number } | null };
+
+    const ctx = {
+      booking_id: result.booking_id,
+      customer_name: result.full_name ?? "",
+      phone: result.phone,
+      slot_start: result.slot_start,
+      slot_end: result.slot_end,
+      service_name: svc?.name ?? "",
+      duration_minutes: svc?.duration_minutes ?? 0,
+      manage_token: token,
+    };
+
+    if (decision === "accept") {
+      await enqueueBookingApproved(ctx);
+    } else {
+      await enqueueBookingCancelled(ctx);
+    }
+
+    revalidatePath("/admin/bookings");
+    revalidatePath("/admin/notifications");
+  }
+
+  return { status: result.status };
 }
 
 // ============================================================================
