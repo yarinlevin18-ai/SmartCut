@@ -44,6 +44,7 @@ export default function BookingsPage() {
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [copiedToken, setCopiedToken] = useState<string | null>(null);
+  const [copiedWix, setCopiedWix] = useState<string | null>(null);
   const [denyTarget, setDenyTarget] = useState<DenyModalState>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [, startTransition] = useTransition();
@@ -67,6 +68,43 @@ export default function BookingsPage() {
     } catch {
       /* ignore */
     }
+  };
+
+  // Open the Wix Bookings dashboard in a new tab AND copy the customer's
+  // details to clipboard, so the barber can paste them into Wix's "create
+  // booking" form to issue a receipt. Manual bridge while we don't have
+  // a real Wix API sync (Path A).
+  const openInWix = async (booking: Booking): Promise<void> => {
+    const slot = booking.slot_start
+      ? new Date(booking.slot_start).toLocaleString("he-IL", {
+          timeZone: "Asia/Jerusalem",
+          dateStyle: "medium",
+          timeStyle: "short",
+        })
+      : booking.preferred_date
+        ? `${booking.preferred_date} ${booking.preferred_time ?? ""}`.trim()
+        : "—";
+    const lines = [
+      `שם: ${booking.full_name}`,
+      `טלפון: ${booking.phone}`,
+      booking.email ? `אימייל: ${booking.email}` : null,
+      `שירות: ${booking.service?.name ?? "—"}`,
+      `מחיר: ₪${booking.service?.price ?? "—"}`,
+      `מועד: ${slot}`,
+      booking.notes ? `הערות: ${booking.notes}` : null,
+    ].filter(Boolean) as string[];
+    const text = lines.join("\n");
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedWix(booking.id);
+      setTimeout(
+        () => setCopiedWix((cur) => (cur === booking.id ? null : cur)),
+        1800,
+      );
+    } catch {
+      /* ignore — popup might be blocked, link still opens */
+    }
+    window.open("https://manage.wix.com/dashboard", "_blank", "noopener,noreferrer");
   };
 
   // A booking is "manageable" by the customer iff status is confirmed AND
@@ -526,6 +564,40 @@ export default function BookingsPage() {
                             >
                               התקשר
                             </a>
+
+                            {/* Path A Wix bridge: copy details + open Wix dashboard */}
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openInWix(booking);
+                              }}
+                              className="font-label uppercase transition-all"
+                              style={{
+                                border:
+                                  copiedWix === booking.id
+                                    ? "1px solid rgba(74,222,128,0.5)"
+                                    : "1px solid rgba(255,255,255,0.18)",
+                                color:
+                                  copiedWix === booking.id
+                                    ? "#4ade80"
+                                    : "rgba(255,255,255,0.75)",
+                                background:
+                                  copiedWix === booking.id
+                                    ? "rgba(74,222,128,0.06)"
+                                    : "transparent",
+                                fontSize: 10,
+                                fontWeight: 600,
+                                padding: "10px 20px",
+                                borderRadius: 0,
+                                letterSpacing: "0.28em",
+                              }}
+                              title="פתח את לוח הבקרה של Wix והעתק את פרטי הלקוח להדבקה"
+                            >
+                              {copiedWix === booking.id
+                                ? "הועתק → Wix"
+                                : "פתח ב-Wix ↗"}
+                            </button>
                             {booking.email && (
                               <a
                                 href={`mailto:${booking.email}`}
@@ -647,7 +719,7 @@ export default function BookingsPage() {
             borderRadius: 0,
           }}
         >
-          בקשות נשמרות לצרכי מעקב. לקוחות מועברים ל-Wix Bookings להשלמת ההזמנה.
+          תורים מנוהלים מכאן. להפקת קבלה ב-Wix — &quot;פתח ב-Wix&quot; מעתיק את פרטי הלקוח ופותח את לוח הבקרה.
         </div>
       )}
 

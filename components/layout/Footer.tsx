@@ -8,9 +8,6 @@ import { CookiePreferencesButton } from "@/components/legal/CookiePreferencesBut
 export function Footer() {
   const instagramUrl = process.env.NEXT_PUBLIC_INSTAGRAM_URL ?? "#";
   const bitpayUrl = process.env.NEXT_PUBLIC_BITPAY_URL ?? "#";
-  const wixUrl =
-    process.env.NEXT_PUBLIC_WIX_BOOKING_URL ??
-    "https://www.carmelis-studio.com/book-online";
 
   const [phone, setPhone] = useState("052-455-0069");
 
@@ -127,15 +124,13 @@ export function Footer() {
               >
                 Instagram
               </a>
-              <a
-                href={wixUrl}
-                target="_blank"
-                rel="noopener noreferrer"
+              <Link
+                href="/booking"
                 className="font-body text-white/70 hover:text-gold-accent transition-colors"
                 style={{ fontSize: 13, fontWeight: 300 }}
               >
                 הזמנה מהירה
-              </a>
+              </Link>
               <a
                 href={bitpayUrl}
                 target="_blank"
