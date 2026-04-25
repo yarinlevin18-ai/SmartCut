@@ -18,6 +18,8 @@ import type {
   Booking,
   BookingInput,
   BookingStatus,
+  Product,
+  ProductInput,
   ServerActionResult,
   AvailabilityConfigRow,
   BlockedDate,
@@ -1192,6 +1194,290 @@ export async function customerConfirmAlternativeByToken(
   }
 
   return { status: result.status };
+}
+
+// ============================================================================
+// PHASE 6 — PRODUCTS (retail catalogue)
+// ============================================================================
+
+/**
+ * Public read. Returns ACTIVE products only by default; pass activeOnly=false
+ * (admin only) to get the full catalogue.
+ */
+export async function getProducts(
+  activeOnly = true,
+): Promise<ServerActionResult<Product[]>> {
+  try {
+    const supabase = createAnonClient();
+    let q = supabase
+      .from("products")
+      .select("*")
+      .order("display_order", { ascending: true })
+      .order("created_at", { ascending: true });
+    if (activeOnly) q = q.eq("is_active", true);
+    const { data, error } = await q;
+    if (error) throw error;
+    return { success: true, data: (data ?? []) as Product[] };
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : "Failed to fetch products",
+    };
+  }
+}
+
+/** Admin variant — returns all products including inactive. */
+export async function getProductsAdmin(): Promise<ServerActionResult<Product[]>> {
+  try {
+    await requireAdmin();
+    const supabase = createServerAdmin();
+    const { data, error } = await supabase
+      .from("products")
+      .select("*")
+      .order("display_order", { ascending: true })
+      .order("created_at", { ascending: true });
+    if (error) throw error;
+    return { success: true, data: (data ?? []) as Product[] };
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : "Failed to fetch products",
+    };
+  }
+}
+
+export async function createProduct(
+  input: ProductInput,
+): Promise<ServerActionResult<Product>> {
+  try {
+    await requireAdmin();
+    const name = input.name?.trim();
+    if (!name) return { success: false, error: "Missing name" };
+    if (input.price !== null && input.price !== undefined && input.price < 0) {
+      return { success: false, error: "Invalid price" };
+    }
+
+    const supabase = createServerAdmin();
+
+    // Append to end of catalogue.
+    const { data: maxRow } = await supabase
+      .from("products")
+      .select("display_order")
+      .order("display_order", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const nextOrder = (maxRow?.display_order ?? 0) + 1;
+
+    const { data, error } = await supabase
+      .from("products")
+      .insert([
+        {
+          name,
+          description: input.description?.trim() || null,
+          price: input.price ?? null,
+          image_url: input.image_url ?? null,
+          is_active: input.is_active ?? true,
+          display_order: nextOrder,
+        },
+      ])
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    revalidateTag("products");
+    revalidatePath("/");
+    revalidatePath("/products");
+    revalidatePath("/admin/products");
+
+    return { success: true, data: data as Product };
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : "Failed to create product",
+    };
+  }
+}
+
+export async function updateProduct(
+  id: string,
+  input: Partial<ProductInput>,
+): Promise<ServerActionResult<Product>> {
+  try {
+    await requireAdmin();
+    if (!UUID_RE.test(id)) return { success: false, error: "Invalid id" };
+
+    const supabase = createServerAdmin();
+    const patch: Record<string, unknown> = {};
+    if (typeof input.name === "string") patch.name = input.name.trim();
+    if (input.description !== undefined) patch.description = input.description?.trim() || null;
+    if (input.price !== undefined) patch.price = input.price;
+    if (input.image_url !== undefined) patch.image_url = input.image_url;
+    if (typeof input.is_active === "boolean") patch.is_active = input.is_active;
+
+    if (Object.keys(patch).length === 0) {
+      return { success: false, error: "No fields to update" };
+    }
+
+    const { data, error } = await supabase
+      .from("products")
+      .update(patch)
+      .eq("id", id)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    revalidateTag("products");
+    revalidatePath("/");
+    revalidatePath("/products");
+    revalidatePath("/admin/products");
+
+    return { success: true, data: data as Product };
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : "Failed to update product",
+    };
+  }
+}
+
+export async function deleteProduct(id: string): Promise<ServerActionResult> {
+  try {
+    await requireAdmin();
+    if (!UUID_RE.test(id)) return { success: false, error: "Invalid id" };
+    const supabase = createServerAdmin();
+
+    // Best-effort: also clean up the image from storage if it's in our bucket.
+    const { data: row } = await supabase
+      .from("products")
+      .select("image_url")
+      .eq("id", id)
+      .maybeSingle();
+    if (row?.image_url) {
+      // image_url may be a full public URL; extract the storage path.
+      const path = extractProductsBucketPath(row.image_url);
+      if (path) {
+        await supabase.storage.from("products").remove([path]);
+      }
+    }
+
+    const { error } = await supabase.from("products").delete().eq("id", id);
+    if (error) throw error;
+
+    revalidateTag("products");
+    revalidatePath("/");
+    revalidatePath("/products");
+    revalidatePath("/admin/products");
+    return { success: true };
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : "Failed to delete product",
+    };
+  }
+}
+
+/**
+ * Move a product up or down in the display_order. Direction +1 = down (later),
+ * -1 = up (earlier). Swaps with the adjacent product so order stays compact.
+ */
+export async function reorderProduct(
+  id: string,
+  direction: 1 | -1,
+): Promise<ServerActionResult> {
+  try {
+    await requireAdmin();
+    if (!UUID_RE.test(id)) return { success: false, error: "Invalid id" };
+    const supabase = createServerAdmin();
+
+    const { data: cur } = await supabase
+      .from("products")
+      .select("id, display_order")
+      .eq("id", id)
+      .maybeSingle();
+    if (!cur) return { success: false, error: "Not found" };
+
+    // Find the adjacent product to swap with.
+    const cmp = direction === 1 ? "gt" : "lt";
+    const order: "asc" | "desc" = direction === 1 ? "asc" : "desc";
+    const { data: neighbour } = await supabase
+      .from("products")
+      .select("id, display_order")
+      [cmp]("display_order", cur.display_order)
+      .order("display_order", { ascending: order === "asc" })
+      .limit(1)
+      .maybeSingle();
+
+    if (!neighbour) {
+      // Already at the edge.
+      return { success: true };
+    }
+
+    // Swap. Two updates aren't atomic but for a single-admin tool that's fine.
+    await supabase.from("products").update({ display_order: neighbour.display_order }).eq("id", cur.id);
+    await supabase.from("products").update({ display_order: cur.display_order }).eq("id", neighbour.id);
+
+    revalidateTag("products");
+    revalidatePath("/");
+    revalidatePath("/products");
+    revalidatePath("/admin/products");
+    return { success: true };
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : "Failed to reorder",
+    };
+  }
+}
+
+/**
+ * Upload a product image to the 'products' storage bucket. Returns the public URL
+ * for the caller to put into product.image_url.
+ *
+ * Caller passes Base64-encoded bytes (matches the gallery upload pattern).
+ */
+export async function uploadProductImage(
+  base64Data: string,
+  fileName: string,
+  contentType: string,
+): Promise<ServerActionResult<{ storagePath: string; publicUrl: string }>> {
+  try {
+    await requireAdmin();
+    if (!base64Data) return { success: false, error: "Missing data" };
+
+    const supabase = createServerAdmin();
+    const filename = `${Date.now()}-${fileName}`;
+    const buffer = Buffer.from(base64Data, "base64");
+
+    const { error: uploadError } = await supabase.storage
+      .from("products")
+      .upload(filename, buffer, { contentType, upsert: false });
+
+    if (uploadError) {
+      console.error("[Products] Upload failed:", uploadError);
+      throw uploadError;
+    }
+
+    const { data } = supabase.storage.from("products").getPublicUrl(filename);
+
+    return {
+      success: true,
+      data: { storagePath: filename, publicUrl: data.publicUrl },
+    };
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : "Failed to upload";
+    console.error("[Products] uploadProductImage failed:", errorMessage);
+    return { success: false, error: errorMessage };
+  }
+}
+
+/** Extract storage path from a full Supabase public URL like
+ *  https://<project>.supabase.co/storage/v1/object/public/products/<path>
+ *  Returns null if the URL isn't a products-bucket URL we own. */
+function extractProductsBucketPath(url: string): string | null {
+  const match = /\/storage\/v1\/object\/public\/products\/(.+)$/.exec(url);
+  return match?.[1] ?? null;
 }
 
 // ============================================================================
