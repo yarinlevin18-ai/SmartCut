@@ -1,13 +1,10 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase";
-import {
-  getServices,
-  getGallery,
-  getBookings,
-} from "@/lib/actions";
+import { getBookings } from "@/lib/actions";
 import { getGcalStatus } from "@/lib/gcal";
 import { GcalPanel } from "./GcalPanel";
+import { TodaySchedule } from "./TodaySchedule";
 
 export const dynamic = "force-dynamic";
 
@@ -22,42 +19,14 @@ export default async function AdminPage() {
     redirect("/admin/login");
   }
 
-  const [servicesRes, galleryRes, bookingsRes, gcalStatus] = await Promise.all([
-    getServices(),
-    getGallery(),
+  const [bookingsRes, gcalStatus] = await Promise.all([
     getBookings(),
     getGcalStatus(),
   ]);
 
-  const servicesCount =
-    servicesRes.success && servicesRes.data ? servicesRes.data.length : 0;
-  const galleryCount =
-    galleryRes.success && galleryRes.data ? galleryRes.data.length : 0;
   const bookings =
     bookingsRes.success && bookingsRes.data ? bookingsRes.data : [];
-  const bookingsCount = bookings.length;
   const recentBookings = bookings.slice(0, 5);
-
-  const stats = [
-    {
-      label: "שירותים",
-      en: "Services",
-      value: servicesCount,
-      href: "/admin/services",
-    },
-    {
-      label: "תמונות בגלריה",
-      en: "Gallery",
-      value: galleryCount,
-      href: "/admin/gallery",
-    },
-    {
-      label: "בקשות תור",
-      en: "Bookings",
-      value: bookingsCount,
-      href: "/admin/bookings",
-    },
-  ];
 
   return (
     <div className="max-w-6xl">
@@ -90,61 +59,8 @@ export default async function AdminPage() {
         </p>
       </div>
 
-      {/* Stats grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-12">
-        {stats.map((stat) => (
-          <Link
-            key={stat.href}
-            href={stat.href}
-            className="group block p-8 transition-all hover:bg-white/5"
-            style={{
-              background: "#080808",
-              border: "1px solid rgba(201,168,76,0.15)",
-            }}
-          >
-            <div className="flex items-center justify-between mb-5">
-              <p
-                className="font-label uppercase text-white/50 group-hover:text-gold-accent transition-colors"
-                style={{
-                  fontSize: 10,
-                  fontWeight: 600,
-                  letterSpacing: "0.32em",
-                }}
-              >
-                {stat.en}
-              </p>
-              <span
-                className="w-1.5 h-1.5 rotate-45 bg-gold-accent/60 group-hover:bg-gold-accent transition-colors"
-                aria-hidden
-              />
-            </div>
-            <div
-              className="font-display text-white mb-2"
-              style={{ fontSize: 56, lineHeight: 1 }}
-            >
-              {stat.value}
-            </div>
-            <p
-              className="font-body text-white/60"
-              style={{ fontSize: 13, fontWeight: 300 }}
-            >
-              {stat.label}
-            </p>
-            <div
-              className="mt-6 pt-4 font-label uppercase text-gold-accent group-hover:text-gold-light transition-colors flex items-center gap-2"
-              style={{
-                fontSize: 10,
-                fontWeight: 600,
-                letterSpacing: "0.28em",
-                borderTop: "1px solid rgba(255,255,255,0.06)",
-              }}
-            >
-              <span>Open</span>
-              <span aria-hidden>←</span>
-            </div>
-          </Link>
-        ))}
-      </div>
+      {/* Today's schedule — primary daily-driver view for the barber */}
+      <TodaySchedule bookings={bookings} />
 
       {/* Google Calendar integration panel (Phase 7) */}
       <GcalPanel

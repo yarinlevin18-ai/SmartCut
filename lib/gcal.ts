@@ -17,7 +17,10 @@ import { formatInTimeZone } from "date-fns-tz";
 const TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token";
 const CALENDAR_API_BASE = "https://www.googleapis.com/calendar/v3/calendars";
 const REVOKE_ENDPOINT = "https://oauth2.googleapis.com/revoke";
-const SCOPE = "https://www.googleapis.com/auth/calendar.events";
+// `openid email` are needed for the id_token in the token-exchange response;
+// that's how we discover which Google account just authorized us (display only,
+// not used for auth — the access_token is the real credential).
+const SCOPE = "openid email https://www.googleapis.com/auth/calendar.events";
 const JERUSALEM_TZ = "Asia/Jerusalem";
 
 // 60-second skew buffer — refresh proactively before the access token's true
