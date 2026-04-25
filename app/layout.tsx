@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { AnimationProvider } from "@/components/providers/AnimationProvider";
 import { CookieConsent } from "@/components/legal/CookieConsent";
+import { DustLayer } from "@/components/effects/DustLayer";
 import { Heebo, DM_Serif_Display, Montserrat } from "next/font/google";
 
 const heebo = Heebo({
@@ -190,8 +191,9 @@ export default function RootLayout({
         ></script>
       </head>
       <body className="bg-dark text-white font-body">
+        <DustLayer />
         <AnimationProvider>
-          {children}
+          <div className="relative z-[2]">{children}</div>
         </AnimationProvider>
         <CookieConsent />
       </body>
