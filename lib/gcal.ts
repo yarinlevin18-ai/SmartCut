@@ -363,6 +363,95 @@ export async function deleteEvent(eventId: string): Promise<boolean> {
   }
 }
 
+// ============================================================================
+// Read events (for displaying the calendar inside the admin dashboard)
+// ============================================================================
+
+export interface GcalEventSummary {
+  id: string;
+  summary: string;
+  description: string | null;
+  location: string | null;
+  start: string; // ISO UTC, derived from start.dateTime ?? start.date
+  end: string;
+  isAllDay: boolean;
+  htmlLink: string | null;
+}
+
+interface GcalListResponse {
+  items?: Array<{
+    id: string;
+    summary?: string;
+    description?: string;
+    location?: string;
+    start?: { dateTime?: string; date?: string; timeZone?: string };
+    end?: { dateTime?: string; date?: string; timeZone?: string };
+    htmlLink?: string;
+    status?: string;
+  }>;
+}
+
+/**
+ * Fetch upcoming events from the connected calendar. Returns up to `maxResults`
+ * events between now and now + `daysAhead` days, expanded (recurring events
+ * become individual instances), ordered by start time. Returns null if
+ * disconnected / API error — caller renders a fallback.
+ */
+export async function listUpcomingEvents(
+  daysAhead = 7,
+  maxResults = 50,
+): Promise<GcalEventSummary[] | null> {
+  try {
+    const tok = await getOrRefreshAccessToken();
+    if (!tok) return null;
+
+    const timeMin = new Date().toISOString();
+    const timeMax = new Date(Date.now() + daysAhead * 24 * 3600_000).toISOString();
+    const params = new URLSearchParams({
+      timeMin,
+      timeMax,
+      singleEvents: "true",
+      orderBy: "startTime",
+      maxResults: String(maxResults),
+    });
+    const url = `${CALENDAR_API_BASE}/${encodeURIComponent(tok.calendarId)}/events?${params.toString()}`;
+
+    const res = await fetch(url, {
+      headers: { Authorization: `Bearer ${tok.accessToken}` },
+      cache: "no-store",
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      console.error("[gcal] listUpcomingEvents failed", res.status, text.slice(0, 200));
+      return null;
+    }
+    const data = (await res.json()) as GcalListResponse;
+
+    return (data.items ?? [])
+      // Drop cancelled events — Google leaves tombstones in the response.
+      .filter((e) => e.status !== "cancelled")
+      .map((e) => {
+        const startVal = e.start?.dateTime ?? e.start?.date;
+        const endVal = e.end?.dateTime ?? e.end?.date;
+        const isAllDay = Boolean(e.start?.date && !e.start?.dateTime);
+        return {
+          id: e.id,
+          summary: e.summary ?? "(ללא כותרת)",
+          description: e.description ?? null,
+          location: e.location ?? null,
+          start: startVal ? new Date(startVal).toISOString() : "",
+          end: endVal ? new Date(endVal).toISOString() : "",
+          isAllDay,
+          htmlLink: e.htmlLink ?? null,
+        } satisfies GcalEventSummary;
+      })
+      .filter((e) => e.start && e.end);
+  } catch (err) {
+    console.error("[gcal] listUpcomingEvents threw", err instanceof Error ? err.message : err);
+    return null;
+  }
+}
+
 /**
  * Revoke + remove the stored token. Best-effort revoke — even if Google
  * rejects, we still wipe the row so the integration is "disconnected" locally.

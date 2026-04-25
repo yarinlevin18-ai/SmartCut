@@ -2,9 +2,10 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase";
 import { getBookings } from "@/lib/actions";
-import { getGcalStatus } from "@/lib/gcal";
+import { getGcalStatus, listUpcomingEvents } from "@/lib/gcal";
 import { GcalPanel } from "./GcalPanel";
 import { TodaySchedule } from "./TodaySchedule";
+import { CalendarView } from "./CalendarView";
 
 export const dynamic = "force-dynamic";
 
@@ -23,6 +24,13 @@ export default async function AdminPage() {
     getBookings(),
     getGcalStatus(),
   ]);
+
+  // Fetch upcoming Google Calendar events only when connected — avoids a
+  // pointless API call on every dashboard render for accounts that haven't
+  // wired the integration yet.
+  const upcomingEvents = gcalStatus.connected
+    ? await listUpcomingEvents(7, 50)
+    : null;
 
   const bookings =
     bookingsRes.success && bookingsRes.data ? bookingsRes.data : [];
@@ -59,7 +67,7 @@ export default async function AdminPage() {
         </p>
       </div>
 
-      {/* Today's schedule — primary daily-driver view for the barber */}
+      {/* Today's schedule — primary daily-driver view (DB-backed). */}
       <TodaySchedule bookings={bookings} />
 
       {/* Google Calendar integration panel (Phase 7) */}
@@ -68,6 +76,9 @@ export default async function AdminPage() {
         connected={gcalStatus.connected}
         accountEmail={gcalStatus.account_email}
       />
+
+      {/* Next 7 days from Google Calendar — only renders when connected. */}
+      <CalendarView events={upcomingEvents} connected={gcalStatus.connected} />
 
       {/* Recent bookings */}
       <div
