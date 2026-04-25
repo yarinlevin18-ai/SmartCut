@@ -13,6 +13,7 @@ export function Navbar() {
   const links = [
     { href: "/", label: "בית" },
     { href: "/services", label: "שירותים" },
+    { href: "/products", label: "מוצרים" },
     { href: "/gallery", label: "גלריה" },
     { href: "/booking", label: "הזמנה" },
   ];
