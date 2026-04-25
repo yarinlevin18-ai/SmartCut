@@ -75,6 +75,7 @@ export default async function ManageBookingPage({ params }: ManagePageProps) {
             initialStatus={booking.status}
             cutoffPassed={cutoffPassed}
             slotInPast={slotInPast}
+            serviceId={booking.service_id}
           />
         </div>
       </main>
