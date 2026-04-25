@@ -13,7 +13,23 @@ export type NotificationBookingContext = {
   slot_end: string; // ISO UTC
   service_name: string;
   duration_minutes: number;
+  /** Opaque UUID from bookings.manage_token. Required so the SMS body can include the self-service manage link. */
+  manage_token: string;
 };
+
+/**
+ * Resolve the public site URL for manage-link inclusion in SMS bodies.
+ * Order of precedence:
+ *   1. NEXT_PUBLIC_SITE_URL — explicit, set per environment
+ *   2. https://carmelis.co.il — production fallback (matches the live domain)
+ * No leading scheme defaults; bare hostnames in templates would render as
+ * relative paths in some SMS clients.
+ */
+function siteUrl(): string {
+  const fromEnv = process.env.NEXT_PUBLIC_SITE_URL;
+  if (fromEnv && /^https?:\/\//.test(fromEnv)) return fromEnv.replace(/\/$/, "");
+  return "https://carmelis.co.il";
+}
 
 type EnqueueRow = {
   booking_id: string;
@@ -34,6 +50,8 @@ function buildPayload(ctx: NotificationBookingContext): Record<string, unknown> 
     slot_start_local_date: formatInTimeZone(ctx.slot_start, JERUSALEM_TZ, "dd/MM/yyyy"),
     slot_start_local_time: formatInTimeZone(ctx.slot_start, JERUSALEM_TZ, "HH:mm"),
     slot_start_local_weekday: formatInTimeZone(ctx.slot_start, JERUSALEM_TZ, "EEEE"),
+    manage_token: ctx.manage_token,
+    manage_url: `${siteUrl()}/booking/manage/${ctx.manage_token}`,
   };
 }
 

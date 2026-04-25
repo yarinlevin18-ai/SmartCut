@@ -639,6 +639,7 @@ export async function createBooking(
     slot_end: slotEndIso,
     service_name: serviceName,
     duration_minutes: duration,
+    manage_token: booking.manage_token,
   });
 
   revalidatePath("/admin/bookings");
@@ -686,7 +687,7 @@ export async function cancelBooking(id: string): Promise<ServerActionResult> {
       .update({ status: "cancelled" })
       .eq("id", id)
       .neq("status", "cancelled")
-      .select("id, full_name, phone, slot_start, slot_end, service_id, services(name, duration_minutes)")
+      .select("id, full_name, phone, slot_start, slot_end, service_id, manage_token, services(name, duration_minutes)")
       .single();
 
     if (error) throw error;
@@ -702,6 +703,7 @@ export async function cancelBooking(id: string): Promise<ServerActionResult> {
         slot_end: data.slot_end,
         service_name: (svc?.name as string | undefined) ?? "",
         duration_minutes: (svc?.duration_minutes as number | undefined) ?? 0,
+        manage_token: data.manage_token as string,
       });
     }
 
@@ -804,6 +806,7 @@ export async function cancelBookingByToken(
       slot_end: result.slot_end,
       service_name: svc?.name ?? "",
       duration_minutes: svc?.duration_minutes ?? 0,
+      manage_token: token,
     });
 
     revalidatePath("/admin/bookings");
@@ -894,6 +897,7 @@ export async function rescheduleBookingByToken(
       slot_end: result.new_slot_end,
       service_name: svc?.name ?? "",
       duration_minutes: svc?.duration_minutes ?? 0,
+      manage_token: token,
     });
 
     revalidatePath("/admin/bookings");
