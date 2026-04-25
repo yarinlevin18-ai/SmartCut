@@ -207,19 +207,8 @@ export function Footer() {
           <span className="h-px flex-1 bg-white/8" />
         </div>
 
-        {/* Bottom row: copyright */}
-        <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-          <span
-            className="font-label uppercase text-white/35"
-            style={{
-              fontSize: 10,
-              fontWeight: 500,
-              letterSpacing: "0.28em",
-            }}
-          >
-            &copy; {new Date().getFullYear()} Carmeli&apos;s Studio · All rights
-            reserved
-          </span>
+        {/* Bottom row: tagline */}
+        <div className="flex items-center justify-center">
           <span
             className="font-label uppercase text-white/30"
             style={{
@@ -232,7 +221,9 @@ export function Footer() {
           </span>
         </div>
 
-        {/* Software credit + legal ownership notice */}
+        {/* Software credit + legal ownership notice (Yarin Levin retains
+            rights to the app itself; Carmeli's Studio owns the marketing
+            content per /terms). */}
         <div className="mt-6 pt-6 border-t border-white/5 flex flex-col md:flex-row items-center justify-center gap-2 text-center">
           <span
             className="font-label uppercase text-white/30"
