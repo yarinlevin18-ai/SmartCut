@@ -36,7 +36,12 @@ export function TodaySchedule({ bookings }: TodayScheduleProps) {
   const todays = bookings
     .filter((b) => {
       if (!b.slot_start) return false;
-      if (b.status === "cancelled" || b.status === "denied") return false;
+      // Only confirmed / completed / no_show appear on the schedule —
+      // pending bookings live in the PendingRequests panel above.
+      // Cancelled and denied are hidden from the daily-driver view.
+      if (b.status !== "confirmed" && b.status !== "completed" && b.status !== "no_show") {
+        return false;
+      }
       const dateStr = formatInTimeZone(b.slot_start, JERUSALEM_TZ, "yyyy-MM-dd");
       return dateStr === todayStr;
     })
@@ -48,7 +53,6 @@ export function TodaySchedule({ bookings }: TodayScheduleProps) {
 
   // Pretty Hebrew weekday + date for the header.
   const headerDate = formatInTimeZone(new Date(), JERUSALEM_TZ, "EEEE, dd/MM/yyyy");
-  const pendingCount = todays.filter((b) => b.status === "pending").length;
 
   return (
     <div
@@ -80,9 +84,7 @@ export function TodaySchedule({ bookings }: TodayScheduleProps) {
             className="font-body text-white/45 mt-1"
             style={{ fontSize: 12, fontWeight: 300 }}
           >
-            {todays.length === 0
-              ? "אין תורים היום"
-              : `${todays.length} תורים${pendingCount > 0 ? ` · ${pendingCount} ממתינים לאישור` : ""}`}
+            {todays.length === 0 ? "אין תורים היום" : `${todays.length} תורים`}
           </p>
         </div>
         <Link

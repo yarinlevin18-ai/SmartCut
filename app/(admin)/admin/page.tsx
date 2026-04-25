@@ -6,6 +6,7 @@ import { getGcalStatus } from "@/lib/gcal";
 import { GcalPanel } from "./GcalPanel";
 import { TodaySchedule } from "./TodaySchedule";
 import { BookingsCalendar } from "./BookingsCalendar";
+import { PendingRequests } from "./PendingRequests";
 import type { User } from "@supabase/supabase-js";
 
 export const dynamic = "force-dynamic";
@@ -87,10 +88,14 @@ export default async function AdminPage() {
         </h1>
       </div>
 
-      {/* Today's schedule — focused, time-ordered list of TODAY's bookings. */}
+      {/* Pending requests — top priority, only renders when there's
+          something to act on. Renders nothing when the queue is empty. */}
+      <PendingRequests bookings={bookings} />
+
+      {/* Today's schedule — confirmed bookings for today only. */}
       <TodaySchedule bookings={bookings} />
 
-      {/* This week — calendar grid of bookings only (our data, not GCal). */}
+      {/* This week — confirmed-only calendar grid. */}
       <BookingsCalendar bookings={bookings} />
 
       {/* Recent bookings */}

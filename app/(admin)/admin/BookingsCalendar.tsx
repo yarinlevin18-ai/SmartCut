@@ -48,11 +48,14 @@ export function BookingsCalendar({ bookings, days = 7 }: BookingsCalendarProps) 
     return formatInTimeZone(d, JERUSALEM_TZ, "yyyy-MM-dd");
   });
 
-  // Group bookings by Asia/Jerusalem date, filtering to "actionable" rows.
+  // Group bookings by Asia/Jerusalem date. Calendar view shows the
+  // confirmed schedule only — pending requests live in the PendingRequests
+  // panel above the dashboard, where they can be acted on with quick
+  // approve / deny.
   const byDay = new Map<string, Booking[]>();
   for (const b of bookings) {
     if (!b.slot_start) continue;
-    if (b.status !== "confirmed" && b.status !== "pending") continue;
+    if (b.status !== "confirmed") continue;
     const key = formatInTimeZone(b.slot_start, JERUSALEM_TZ, "yyyy-MM-dd");
     if (!dayKeys.includes(key)) continue;
     const list = byDay.get(key) ?? [];
