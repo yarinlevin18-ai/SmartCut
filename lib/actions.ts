@@ -13,6 +13,8 @@ import type {
   ServerActionResult,
   AvailabilityConfigRow,
   BlockedDate,
+  Notification,
+  NotificationStatus,
 } from "@/types";
 
 const UUID_RE =
@@ -990,5 +992,107 @@ export async function removeBlockedDate(
     const errorMessage =
       error instanceof Error ? error.message : "Failed to remove blocked date";
     return { success: false, error: errorMessage };
+  }
+}
+
+// ============================================================================
+// NOTIFICATIONS (admin viewer + manual overrides)
+// ============================================================================
+
+export type NotificationWithBooking = Notification & {
+  bookings: { full_name: string; slot_start: string | null } | null;
+};
+
+export async function getNotifications(filters?: {
+  status?: NotificationStatus | "all";
+  sinceDays?: number;
+}): Promise<ServerActionResult<NotificationWithBooking[]>> {
+  try {
+    await requireAdmin();
+    const supabase = createServerAdmin();
+    let query = supabase
+      .from("notifications")
+      .select("*, bookings(full_name, slot_start)")
+      .order("created_at", { ascending: false })
+      .limit(200);
+
+    if (filters?.status && filters.status !== "all") {
+      query = query.eq("status", filters.status);
+    }
+    if (filters?.sinceDays && filters.sinceDays > 0) {
+      const since = new Date(Date.now() - filters.sinceDays * 24 * 60 * 60 * 1000).toISOString();
+      query = query.gte("created_at", since);
+    }
+
+    const { data, error } = await query;
+    if (error) throw error;
+    return { success: true, data: (data ?? []) as NotificationWithBooking[] };
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : "Failed to fetch notifications";
+    return { success: false, error: msg };
+  }
+}
+
+export async function markNotificationSent(id: string): Promise<ServerActionResult> {
+  try {
+    await requireAdmin();
+    if (!UUID_RE.test(id)) return { success: false, error: "Invalid id" };
+    const supabase = createServerAdmin();
+    const { error } = await supabase
+      .from("notifications")
+      .update({
+        status: "sent",
+        sent_at: new Date().toISOString(),
+        provider: "manual",
+        error: null,
+      })
+      .eq("id", id);
+    if (error) throw error;
+    revalidatePath("/admin/notifications");
+    return { success: true };
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : "Failed to mark sent";
+    return { success: false, error: msg };
+  }
+}
+
+export async function skipNotification(id: string): Promise<ServerActionResult> {
+  try {
+    await requireAdmin();
+    if (!UUID_RE.test(id)) return { success: false, error: "Invalid id" };
+    const supabase = createServerAdmin();
+    const { error } = await supabase
+      .from("notifications")
+      .update({ status: "skipped", error: "manual_skip" })
+      .eq("id", id);
+    if (error) throw error;
+    revalidatePath("/admin/notifications");
+    return { success: true };
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : "Failed to skip";
+    return { success: false, error: msg };
+  }
+}
+
+export async function retryNotification(id: string): Promise<ServerActionResult> {
+  try {
+    await requireAdmin();
+    if (!UUID_RE.test(id)) return { success: false, error: "Invalid id" };
+    const supabase = createServerAdmin();
+    const { error } = await supabase
+      .from("notifications")
+      .update({
+        status: "queued",
+        attempts: 0,
+        error: null,
+        scheduled_for: new Date().toISOString(),
+      })
+      .eq("id", id);
+    if (error) throw error;
+    revalidatePath("/admin/notifications");
+    return { success: true };
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : "Failed to retry";
+    return { success: false, error: msg };
   }
 }

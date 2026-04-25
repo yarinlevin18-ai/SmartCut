@@ -12,6 +12,7 @@ const NAV_ITEMS = [
   { href: "/admin/gallery", label: "גלריה", en: "Gallery" },
   { href: "/admin/availability", label: "זמינות", en: "Availability" },
   { href: "/admin/bookings", label: "תורים", en: "Bookings" },
+  { href: "/admin/notifications", label: "התראות", en: "Notifications" },
 ];
 
 export function AdminSidebar() {
