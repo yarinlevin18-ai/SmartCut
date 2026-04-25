@@ -6,6 +6,8 @@ import {
   getGallery,
   getBookings,
 } from "@/lib/actions";
+import { getGcalStatus } from "@/lib/gcal";
+import { GcalPanel } from "./GcalPanel";
 
 export const dynamic = "force-dynamic";
 
@@ -20,10 +22,11 @@ export default async function AdminPage() {
     redirect("/admin/login");
   }
 
-  const [servicesRes, galleryRes, bookingsRes] = await Promise.all([
+  const [servicesRes, galleryRes, bookingsRes, gcalStatus] = await Promise.all([
     getServices(),
     getGallery(),
     getBookings(),
+    getGcalStatus(),
   ]);
 
   const servicesCount =
@@ -142,6 +145,13 @@ export default async function AdminPage() {
           </Link>
         ))}
       </div>
+
+      {/* Google Calendar integration panel (Phase 7) */}
+      <GcalPanel
+        configured={gcalStatus.configured}
+        connected={gcalStatus.connected}
+        accountEmail={gcalStatus.account_email}
+      />
 
       {/* Recent bookings */}
       <div
