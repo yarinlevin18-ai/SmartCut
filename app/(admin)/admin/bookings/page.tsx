@@ -1,9 +1,42 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { getBookings, deleteBooking } from "@/lib/actions";
-import type { Booking } from "@/types";
+import { formatInTimeZone } from "date-fns-tz";
+import {
+  getBookings,
+  deleteBooking,
+  approveBooking,
+  denyBooking,
+} from "@/lib/actions";
+import { SlotPicker } from "@/components/booking/SlotPicker";
+import type { Booking, BookingStatus } from "@/types";
+
+const JERUSALEM_TZ = "Asia/Jerusalem";
+
+const STATUS_LABEL: Record<BookingStatus, string> = {
+  pending: "ממתין לאישור",
+  confirmed: "מאושר",
+  cancelled: "בוטל",
+  denied: "נדחה",
+  completed: "הושלם",
+  no_show: "לא הגיע",
+};
+
+const STATUS_COLOR: Record<BookingStatus, string> = {
+  pending: "#c9a84c", // gold — needs admin attention
+  confirmed: "#4ade80",
+  cancelled: "#7a7a80",
+  denied: "#f87171",
+  completed: "#52525b",
+  no_show: "#52525b",
+};
+
+type DenyModalState =
+  | null
+  | { booking: Booking; mode: "menu" }
+  | { booking: Booking; mode: "alternative"; slot: string | null }
+  | { booking: Booking; mode: "reject_confirm" };
 
 export default function BookingsPage() {
   const [bookings, setBookings] = useState<Booking[]>([]);
@@ -11,6 +44,9 @@ export default function BookingsPage() {
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [copiedToken, setCopiedToken] = useState<string | null>(null);
+  const [denyTarget, setDenyTarget] = useState<DenyModalState>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [, startTransition] = useTransition();
 
   const manageUrlFor = (token: string): string => {
     const origin =
@@ -67,6 +103,59 @@ export default function BookingsPage() {
       setBookings(bookings.filter((b) => b.id !== id));
     }
   };
+
+  const handleApprove = (id: string): void => {
+    setActionError(null);
+    startTransition(async () => {
+      const r = await approveBooking(id);
+      if (r.success) {
+        await loadBookings();
+      } else {
+        setActionError(
+          r.error === "SLOT_TAKEN"
+            ? "המשבצת תפוסה — בדוק תורים אחרים שכבר אושרו לאותו זמן."
+            : r.error ?? "הפעולה נכשלה",
+        );
+      }
+    });
+  };
+
+  const handleDenyReject = (id: string): void => {
+    setActionError(null);
+    startTransition(async () => {
+      const r = await denyBooking(id, { mode: "reject" });
+      if (r.success) {
+        setDenyTarget(null);
+        await loadBookings();
+      } else {
+        setActionError(r.error ?? "הפעולה נכשלה");
+      }
+    });
+  };
+
+  const handleDenyAlternative = (id: string, newSlotIso: string): void => {
+    setActionError(null);
+    startTransition(async () => {
+      const r = await denyBooking(id, { mode: "alternative", new_slot_start: newSlotIso });
+      if (r.success) {
+        setDenyTarget(null);
+        await loadBookings();
+      } else {
+        const msg =
+          r.error === "SLOT_TAKEN"
+            ? "המשבצת המוצעת תפוסה. בחר זמן אחר."
+            : r.error === "NEW_SLOT_TOO_SOON"
+              ? "המועד החדש קרוב מדי (פחות מ-24 שעות מעכשיו)."
+              : r.error === "INVALID_SLOT"
+                ? "המועד שנבחר לא מיושר על רשת 15 דקות."
+                : (r.error ?? "הפעולה נכשלה");
+        setActionError(msg);
+      }
+    });
+  };
+
+  const fmtSlotLocal = (iso: string): string =>
+    formatInTimeZone(iso, JERUSALEM_TZ, "dd/MM/yyyy HH:mm");
 
   return (
     <div className="max-w-6xl">
@@ -167,11 +256,30 @@ export default function BookingsPage() {
 
                     {/* Name + service */}
                     <div className="flex-1 min-w-0 text-right">
-                      <div
-                        className="font-display text-white truncate"
-                        style={{ fontSize: 18, lineHeight: 1.2 }}
-                      >
-                        {booking.full_name}
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span
+                          className="font-display text-white truncate"
+                          style={{ fontSize: 18, lineHeight: 1.2 }}
+                        >
+                          {booking.full_name}
+                        </span>
+                        {/* Status pill — admin scans the queue at a glance */}
+                        <span
+                          className="font-label uppercase shrink-0"
+                          style={{
+                            fontSize: 9,
+                            fontWeight: 700,
+                            letterSpacing: "0.22em",
+                            padding: "3px 8px",
+                            border: `1px solid ${STATUS_COLOR[booking.status]}40`,
+                            color: STATUS_COLOR[booking.status],
+                            background: `${STATUS_COLOR[booking.status]}10`,
+                          }}
+                        >
+                          {booking.status === "pending" && booking.alt_offered_at
+                            ? "מוצע מועד חלופי"
+                            : STATUS_LABEL[booking.status]}
+                        </span>
                       </div>
                       <div className="flex items-center gap-3 mt-1.5 flex-wrap">
                         <span
@@ -199,28 +307,52 @@ export default function BookingsPage() {
                       </div>
                     </div>
 
-                    {/* Preferred time */}
+                    {/* Slot (live — reflects reschedule / alternative-offer) */}
                     <div className="shrink-0 hidden sm:flex flex-col items-end">
-                      {booking.preferred_date && (
-                        <div
-                          className="font-body text-white/70"
-                          style={{ fontSize: 13, fontWeight: 300 }}
-                        >
-                          {formatDate(booking.preferred_date)}
-                        </div>
-                      )}
-                      {booking.preferred_time && (
-                        <div
-                          className="font-label uppercase text-white/40 mt-1"
-                          style={{
-                            fontSize: 10,
-                            fontWeight: 600,
-                            letterSpacing: "0.24em",
-                          }}
-                          dir="ltr"
-                        >
-                          {booking.preferred_time}
-                        </div>
+                      {booking.slot_start ? (
+                        <>
+                          <div
+                            className="font-body text-white/70"
+                            style={{ fontSize: 13, fontWeight: 300 }}
+                          >
+                            {formatInTimeZone(booking.slot_start, JERUSALEM_TZ, "dd/MM/yyyy")}
+                          </div>
+                          <div
+                            className="font-label uppercase text-white/40 mt-1"
+                            style={{
+                              fontSize: 10,
+                              fontWeight: 600,
+                              letterSpacing: "0.24em",
+                            }}
+                            dir="ltr"
+                          >
+                            {formatInTimeZone(booking.slot_start, JERUSALEM_TZ, "HH:mm")}
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          {booking.preferred_date && (
+                            <div
+                              className="font-body text-white/70"
+                              style={{ fontSize: 13, fontWeight: 300 }}
+                            >
+                              {formatDate(booking.preferred_date)}
+                            </div>
+                          )}
+                          {booking.preferred_time && (
+                            <div
+                              className="font-label uppercase text-white/40 mt-1"
+                              style={{
+                                fontSize: 10,
+                                fontWeight: 600,
+                                letterSpacing: "0.24em",
+                              }}
+                              dir="ltr"
+                            >
+                              {booking.preferred_time}
+                            </div>
+                          )}
+                        </>
                       )}
                     </div>
 
@@ -375,7 +507,8 @@ export default function BookingsPage() {
                             </div>
                           )}
 
-                          <div className="flex gap-2 pt-2">
+                          {/* Status-driven action row */}
+                          <div className="flex gap-2 pt-2 flex-wrap">
                             <a
                               href={`tel:${booking.phone}`}
                               className="font-label uppercase hover:bg-gold-accent hover:text-black transition-all"
@@ -412,25 +545,84 @@ export default function BookingsPage() {
                                 אימייל
                               </a>
                             )}
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setConfirmDelete(booking.id);
-                              }}
-                              className="font-label uppercase hover:bg-red-500/10 transition-all mr-auto"
-                              style={{
-                                border: "1px solid rgba(239,68,68,0.3)",
-                                color: "rgba(239,68,68,0.85)",
-                                background: "transparent",
-                                fontSize: 10,
-                                fontWeight: 600,
-                                padding: "10px 20px",
-                                borderRadius: 0,
-                                letterSpacing: "0.28em",
-                              }}
-                            >
-                              מחק
-                            </button>
+
+                            {/* Pending + no alt offered yet → admin must decide */}
+                            {booking.status === "pending" && !booking.alt_offered_at && (
+                              <>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleApprove(booking.id);
+                                  }}
+                                  className="font-label uppercase transition-all hover:bg-gold-accent hover:text-black mr-auto"
+                                  style={{
+                                    border: "1px solid #c9a84c",
+                                    color: "#c9a84c",
+                                    background: "rgba(201,168,76,0.06)",
+                                    fontSize: 10,
+                                    fontWeight: 700,
+                                    padding: "10px 24px",
+                                    borderRadius: 0,
+                                    letterSpacing: "0.28em",
+                                  }}
+                                >
+                                  אשר · Approve
+                                </button>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setActionError(null);
+                                    setDenyTarget({ booking, mode: "menu" });
+                                  }}
+                                  className="font-label uppercase transition-all hover:bg-red-500/10"
+                                  style={{
+                                    border: "1px solid rgba(248,113,113,0.5)",
+                                    color: "#fca5a5",
+                                    background: "transparent",
+                                    fontSize: 10,
+                                    fontWeight: 600,
+                                    padding: "10px 24px",
+                                    borderRadius: 0,
+                                    letterSpacing: "0.28em",
+                                  }}
+                                >
+                                  דחה · Deny
+                                </button>
+                              </>
+                            )}
+
+                            {/* Pending + alt offered → waiting for the customer */}
+                            {booking.status === "pending" && booking.alt_offered_at && (
+                              <span
+                                className="font-body text-white/55 mr-auto self-center"
+                                style={{ fontSize: 12, fontWeight: 300 }}
+                              >
+                                ממתין לתשובת הלקוח · הוצע: {fmtSlotLocal(booking.slot_start ?? booking.alt_offered_at)}
+                              </span>
+                            )}
+
+                            {/* Confirmed → admin can cancel (existing behavior) */}
+                            {booking.status === "confirmed" && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setConfirmDelete(booking.id);
+                                }}
+                                className="font-label uppercase hover:bg-red-500/10 transition-all mr-auto"
+                                style={{
+                                  border: "1px solid rgba(239,68,68,0.3)",
+                                  color: "rgba(239,68,68,0.85)",
+                                  background: "transparent",
+                                  fontSize: 10,
+                                  fontWeight: 600,
+                                  padding: "10px 20px",
+                                  borderRadius: 0,
+                                  letterSpacing: "0.28em",
+                                }}
+                              >
+                                בטל
+                              </button>
+                            )}
                           </div>
                         </div>
                       </motion.div>
@@ -458,6 +650,257 @@ export default function BookingsPage() {
           בקשות נשמרות לצרכי מעקב. לקוחות מועברים ל-Wix Bookings להשלמת ההזמנה.
         </div>
       )}
+
+      {/* Action error toast (Approve / Deny failures) */}
+      <AnimatePresence>
+        {actionError && (
+          <motion.div
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            className="fixed top-6 left-1/2 -translate-x-1/2 z-[60] max-w-md w-full px-4"
+            role="alert"
+          >
+            <div
+              className="px-4 py-3 font-body text-center cursor-pointer"
+              onClick={() => setActionError(null)}
+              style={{
+                background: "rgba(248,113,113,0.12)",
+                border: "1px solid rgba(248,113,113,0.4)",
+                color: "#fca5a5",
+                fontSize: 13,
+              }}
+            >
+              {actionError}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Deny modal — three states: menu / reject_confirm / alternative */}
+      <AnimatePresence>
+        {denyTarget && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 px-6 py-12 overflow-y-auto"
+            onClick={() => setDenyTarget(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-[#0a0a0a] p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+              style={{ border: "1px solid rgba(248,113,113,0.3)" }}
+              dir="rtl"
+            >
+              <h3
+                className="font-display text-white mb-2"
+                style={{ fontSize: 22 }}
+              >
+                דחיית בקשת תור
+              </h3>
+              <p
+                className="font-body text-white/55 mb-6"
+                style={{ fontSize: 12, fontWeight: 300, lineHeight: 1.6 }}
+              >
+                {denyTarget.booking.full_name} ·{" "}
+                {denyTarget.booking.slot_start
+                  ? fmtSlotLocal(denyTarget.booking.slot_start)
+                  : "—"}
+              </p>
+
+              {denyTarget.mode === "menu" && (
+                <div className="space-y-3">
+                  <p
+                    className="font-body text-white/70 mb-4"
+                    style={{ fontSize: 13, fontWeight: 300, lineHeight: 1.7 }}
+                  >
+                    מה ברצונך לעשות?
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setDenyTarget({
+                        booking: denyTarget.booking,
+                        mode: "alternative",
+                        slot: null,
+                      })
+                    }
+                    className="w-full text-right p-4 font-body transition-all hover:bg-gold-accent/5"
+                    style={{
+                      border: "1px solid rgba(201,168,76,0.4)",
+                      color: "#c9a84c",
+                      background: "transparent",
+                      fontSize: 14,
+                      fontWeight: 500,
+                    }}
+                  >
+                    הצע מועד חלופי
+                    <span
+                      className="block font-body text-white/45 mt-1"
+                      style={{ fontSize: 11, fontWeight: 300 }}
+                    >
+                      בחר מועד חדש — נשלח ללקוח SMS לאישור או דחייה.
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setDenyTarget({
+                        booking: denyTarget.booking,
+                        mode: "reject_confirm",
+                      })
+                    }
+                    className="w-full text-right p-4 font-body transition-all hover:bg-red-500/5"
+                    style={{
+                      border: "1px solid rgba(248,113,113,0.4)",
+                      color: "#fca5a5",
+                      background: "transparent",
+                      fontSize: 14,
+                      fontWeight: 500,
+                    }}
+                  >
+                    דחה לחלוטין
+                    <span
+                      className="block font-body text-white/45 mt-1"
+                      style={{ fontSize: 11, fontWeight: 300 }}
+                    >
+                      ללא הצעת מועד חלופי. הלקוח יקבל SMS התנצלות.
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDenyTarget(null)}
+                    className="w-full mt-2 font-label uppercase transition-all hover:bg-white/5"
+                    style={{
+                      border: "1px solid rgba(255,255,255,0.2)",
+                      color: "rgba(255,255,255,0.7)",
+                      background: "transparent",
+                      fontSize: 11,
+                      fontWeight: 600,
+                      padding: "12px 16px",
+                      letterSpacing: "0.24em",
+                    }}
+                  >
+                    חזור
+                  </button>
+                </div>
+              )}
+
+              {denyTarget.mode === "reject_confirm" && (
+                <div className="space-y-4">
+                  <p
+                    className="font-body text-white/70"
+                    style={{ fontSize: 13, fontWeight: 300, lineHeight: 1.7 }}
+                  >
+                    בטוח? הלקוח יקבל SMS שהבקשה נדחתה. ניתן עדיין להציע לו
+                    פנייה ידנית בנפרד.
+                  </p>
+                  <div className="flex gap-3">
+                    <button
+                      type="button"
+                      onClick={() => handleDenyReject(denyTarget.booking.id)}
+                      className="flex-1 font-label uppercase transition-all hover:opacity-90"
+                      style={{
+                        border: "1px solid rgb(239,68,68)",
+                        color: "#fff",
+                        background: "rgb(220,38,38)",
+                        fontSize: 11,
+                        fontWeight: 700,
+                        padding: "12px 16px",
+                        letterSpacing: "0.24em",
+                      }}
+                    >
+                      כן, דחה
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setDenyTarget(null)}
+                      className="flex-1 font-label uppercase transition-all hover:bg-white/5"
+                      style={{
+                        border: "1px solid rgba(255,255,255,0.2)",
+                        color: "rgba(255,255,255,0.85)",
+                        background: "transparent",
+                        fontSize: 11,
+                        fontWeight: 600,
+                        padding: "12px 16px",
+                        letterSpacing: "0.24em",
+                      }}
+                    >
+                      לא
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {denyTarget.mode === "alternative" && (
+                <div className="space-y-5">
+                  <p
+                    className="font-body text-white/65"
+                    style={{ fontSize: 12, fontWeight: 300, lineHeight: 1.7 }}
+                  >
+                    בחר מועד חלופי. הלקוח יקבל SMS עם קישור לאישור או דחייה.
+                  </p>
+                  <SlotPicker
+                    serviceId={denyTarget.booking.service_id ?? null}
+                    value={denyTarget.slot}
+                    onChange={(iso) =>
+                      setDenyTarget((cur) =>
+                        cur && cur.mode === "alternative"
+                          ? { ...cur, slot: iso }
+                          : cur,
+                      )
+                    }
+                  />
+                  <div className="flex gap-3 pt-2">
+                    <button
+                      type="button"
+                      disabled={!denyTarget.slot}
+                      onClick={() =>
+                        denyTarget.slot &&
+                        handleDenyAlternative(denyTarget.booking.id, denyTarget.slot)
+                      }
+                      className="flex-1 font-label uppercase transition-all hover:bg-gold-accent hover:text-black disabled:opacity-40"
+                      style={{
+                        border: "1px solid #c9a84c",
+                        color: "#c9a84c",
+                        background: "rgba(201,168,76,0.05)",
+                        fontSize: 11,
+                        fontWeight: 700,
+                        padding: "12px 16px",
+                        letterSpacing: "0.24em",
+                      }}
+                    >
+                      שלח הצעה
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setDenyTarget({ booking: denyTarget.booking, mode: "menu" })
+                      }
+                      className="flex-1 font-label uppercase transition-all hover:bg-white/5"
+                      style={{
+                        border: "1px solid rgba(255,255,255,0.2)",
+                        color: "rgba(255,255,255,0.85)",
+                        background: "transparent",
+                        fontSize: 11,
+                        fontWeight: 600,
+                        padding: "12px 16px",
+                        letterSpacing: "0.24em",
+                      }}
+                    >
+                      חזור
+                    </button>
+                  </div>
+                </div>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Confirm delete */}
       <AnimatePresence>
