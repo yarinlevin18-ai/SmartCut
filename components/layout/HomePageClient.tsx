@@ -2,7 +2,6 @@ import { Hero } from "@/components/sections/Hero";
 import { ServicesPreview } from "@/components/sections/ServicesPreview";
 import { ProductsPreview } from "@/components/sections/ProductsPreview";
 import { GalleryPreview } from "@/components/sections/GalleryPreview";
-import { Reviews } from "@/components/sections/Reviews";
 import { CTASection } from "@/components/sections/CTASection";
 import { IntroAnimationWrapper } from "@/components/sections/IntroAnimationWrapper";
 import { Navbar } from "@/components/layout/Navbar";
@@ -21,7 +20,6 @@ export async function HomePageClient() {
         <ServicesPreview />
         <ProductsPreview products={products} />
         <GalleryPreview />
-        <Reviews />
         <CTASection />
       </main>
     </>
