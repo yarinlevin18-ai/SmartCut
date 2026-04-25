@@ -565,7 +565,18 @@ export async function createBooking(
     return { success: false, error: "Invalid phone" };
   }
 
-  const supabase = await createClient();
+  // This server action runs on the server (not in the browser). The user-facing
+  // "anon" RLS distinction is moot — the request reaches Postgres from our
+  // Node process, not from the browser. Use service-role for the write so:
+  //   1. The INSERT is not blocked by SSR-cookie / role weirdness
+  //      (the bookings_anon_insert WITH CHECK was failing for logged-out
+  //      visitors because the SSR client wasn't asserting role='anon').
+  //   2. The .select() after insert can read back the row (anon has no
+  //      SELECT policy, would have returned empty).
+  // App-level validation above (UUID, phone format, slot timing) plus the
+  // bookings_no_overlap GIST exclusion + bookings_status_chk CHECK are the
+  // real gates against bad data. RLS would only have caught role.
+  const supabase = createServerAdmin();
 
   const { data: service, error: serviceError } = await supabase
     .from("services")
