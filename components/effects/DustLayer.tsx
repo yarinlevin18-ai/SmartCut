@@ -7,9 +7,13 @@ import { useEffect, useRef } from "react";
 // document is hidden to avoid burning battery in background tabs. Respects
 // prefers-reduced-motion.
 //
-// Design intent (per user direction): "blends in, flows naturally" — use a
-// gold tint that matches the studio palette, low opacity, slow drift. Should
-// be visible on a still capture but never call attention to itself.
+// Design intent: "blends in, flows naturally" + reacts to scroll so the field
+// feels integrated with the page rather than pasted on top. Two dynamic hooks:
+//   1. Scroll parallax — particles get a brief upward kick proportional to
+//      the user's scroll velocity, simulating "passing through" the dust.
+//   2. Per-particle hue jitter — each mote shifts slightly between gold and
+//      cream so the field has texture instead of looking like a uniform LED
+//      grid.
 
 interface Particle {
   x: number;
@@ -22,16 +26,22 @@ interface Particle {
   /** Alpha 0..1, breathes via sine over `phase`. */
   baseAlpha: number;
   phase: number;
+  /** -1..+1 hue jitter — shifts gold ↔ cream so the field isn't monochrome. */
+  hueShift: number;
+  /** Per-particle parallax sensitivity 0.4..1.0 — slower particles feel
+   *  "deeper", faster ones feel "closer to the camera". */
+  parallax: number;
 }
 
 const PARTICLE_DENSITY = 0.00009; // particles per CSS px²; ~120 on a 1440x900 viewport
 const MIN_PARTICLES = 24;
 const MAX_PARTICLES = 180;
 
-// Gold accent in the studio palette.
-const COLOR_R = 201;
-const COLOR_G = 168;
-const COLOR_B = 76;
+// Base color = studio gold #c9a84c. Particles individually shift toward
+// either a warmer amber or a cooler cream by `hueShift`.
+const BASE_R = 201;
+const BASE_G = 168;
+const BASE_B = 76;
 
 export function DustLayer() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -49,6 +59,24 @@ export function DustLayer() {
     let width = 0;
     let height = 0;
     let particles: Particle[] = [];
+
+    // Scroll-velocity tracking. Decays over time so the kick fades back to
+    // baseline after the user stops scrolling.
+    let scrollVelocity = 0;
+    let lastScrollY = typeof window !== "undefined" ? window.scrollY : 0;
+    let lastScrollT = performance.now();
+
+    const onScroll = (): void => {
+      const now = performance.now();
+      const dt = Math.max(0.001, (now - lastScrollT) / 1000);
+      const dy = window.scrollY - lastScrollY;
+      // Smooth toward the new instantaneous velocity (px/sec). EMA factor 0.4
+      // means a single big scroll spike doesn't dominate the field forever.
+      const instant = dy / dt;
+      scrollVelocity = scrollVelocity * 0.6 + instant * 0.4;
+      lastScrollY = window.scrollY;
+      lastScrollT = now;
+    };
 
     const resize = (): void => {
       width = window.innerWidth;
@@ -82,7 +110,9 @@ export function DustLayer() {
     const tick = (now: number): void => {
       const dt = Math.min(0.05, (now - last) / 1000); // clamp to 50ms — avoids huge jumps after tab-switch
       last = now;
-      step(particles, dt, width, height);
+      // Decay scroll velocity each frame so the kick is brief, not permanent.
+      scrollVelocity *= Math.pow(0.001, dt); // half-life ~0.1s
+      step(particles, dt, width, height, scrollVelocity);
       drawFrame(ctx, particles, now / 1000, width, height);
       if (visible) raf = requestAnimationFrame(tick);
     };
@@ -92,6 +122,10 @@ export function DustLayer() {
       visible = !document.hidden;
       if (visible) {
         last = performance.now();
+        // Reset scroll baseline so a long-paused tab doesn't show a fake jump.
+        lastScrollY = window.scrollY;
+        lastScrollT = performance.now();
+        scrollVelocity = 0;
         raf = requestAnimationFrame(tick);
       } else {
         cancelAnimationFrame(raf);
@@ -99,11 +133,13 @@ export function DustLayer() {
     };
 
     window.addEventListener("resize", resize);
+    window.addEventListener("scroll", onScroll, { passive: true });
     document.addEventListener("visibilitychange", onVisibility);
 
     return () => {
       cancelAnimationFrame(raf);
       window.removeEventListener("resize", resize);
+      window.removeEventListener("scroll", onScroll);
       document.removeEventListener("visibilitychange", onVisibility);
     };
   }, []);
@@ -112,14 +148,25 @@ export function DustLayer() {
     <canvas
       ref={canvasRef}
       aria-hidden
-      // z-[40] sits above section backgrounds (which paint their own
-      // solid colors and would otherwise obscure a body-level dust layer)
-      // but below the navbar (z-50) and any modals (z-[60]+). The screen
-      // blend mode means the canvas only ADDS light — text underneath is
-      // never darkened, particles just sparkle gently over whatever's
-      // there.
-      className="pointer-events-none fixed inset-0 z-[40]"
-      style={{ opacity: 0.85, mixBlendMode: "screen" }}
+      // Inline styles (not Tailwind classes) — this layer is critical for
+      // visual integrity and we don't want a Tailwind JIT hiccup turning it
+      // into a 300×150 invisible canvas. zIndex 40 sits above section
+      // backgrounds, below navbar (z-50) and modals (z-60+). Screen blend
+      // mode means the canvas only ADDS light — text underneath is never
+      // darkened.
+      style={{
+        position: "fixed",
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        width: "100%",
+        height: "100%",
+        pointerEvents: "none",
+        zIndex: 40,
+        opacity: 0.85,
+        mixBlendMode: "screen",
+      }}
     />
   );
 }
@@ -130,6 +177,9 @@ function spawn(width: number, height: number): Particle {
   // Small particles favored — most are barely-visible motes, a few are larger
   // catches-of-light. Bias toward small via 1 - sqrt(rand).
   const t = 1 - Math.sqrt(Math.random());
+  // Parallax: smaller (deeper-looking) motes drift slower and react to scroll
+  // less; bigger ones feel closer.
+  const parallax = 0.4 + t * 0.6;
   return {
     x: Math.random() * width,
     y: Math.random() * height,
@@ -138,20 +188,39 @@ function spawn(width: number, height: number): Particle {
     vy: 4 + Math.random() * 10, // px/sec, mostly downward like drifting dust
     baseAlpha: 0.06 + Math.random() * 0.18, // up to ~0.24 — visible but soft
     phase: Math.random() * Math.PI * 2,
+    hueShift: (Math.random() - 0.5) * 2, // -1 .. +1
+    parallax,
   };
 }
 
-function step(particles: Particle[], dt: number, width: number, height: number): void {
+function step(
+  particles: Particle[],
+  dt: number,
+  width: number,
+  height: number,
+  scrollVelocity: number,
+): void {
+  // Convert scroll velocity (pixels per second of page scroll) into a
+  // counter-motion on the particles. When user scrolls DOWN (positive
+  // scrollVelocity), particles move UP relative to the viewport, simulating
+  // "passing through" them. Capped so a wild flick doesn't fling everything
+  // off-screen. Per-particle parallax scales the effect.
+  const scrollKick = -Math.max(-1500, Math.min(1500, scrollVelocity)) * dt * 0.35;
+
   for (const p of particles) {
     // Add a tiny sin-curl to make drift feel organic instead of straight-line.
     const wobble = Math.sin(p.phase + p.y * 0.01) * 0.6;
     p.x += (p.vx + wobble) * dt;
-    p.y += p.vy * dt;
+    p.y += p.vy * dt + scrollKick * p.parallax;
     p.phase += dt * 0.4;
 
-    // Wrap. Fade-in from the top edge on respawn so they don't pop.
+    // Vertical wrap. After a strong scroll up, particles can overshoot
+    // either edge — wrap both ways so we don't lose the field.
     if (p.y - p.r > height) {
       p.y = -p.r;
+      p.x = Math.random() * width;
+    } else if (p.y + p.r < 0) {
+      p.y = height + p.r;
       p.x = Math.random() * width;
     }
     if (p.x < -p.r) p.x = width + p.r;
@@ -170,13 +239,24 @@ function drawFrame(
   for (const p of particles) {
     // Slow alpha breathing so the field feels alive even when static.
     const alpha = p.baseAlpha * (0.7 + 0.3 * Math.sin(p.phase + tSec * 0.6));
+
+    // Per-particle hue tweak. hueShift -1 → warmer/amber, +1 → cooler/cream.
+    // Stays inside the studio palette either way.
+    const r = clamp(BASE_R + p.hueShift * 14, 0, 255);
+    const g = clamp(BASE_G + p.hueShift * 28, 0, 255);
+    const b = clamp(BASE_B + p.hueShift * 50, 0, 255);
+
     // Soft falloff via radial gradient — cheaper than per-pixel blur.
     const grad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.r * 2.2);
-    grad.addColorStop(0, `rgba(${COLOR_R},${COLOR_G},${COLOR_B},${alpha})`);
-    grad.addColorStop(1, `rgba(${COLOR_R},${COLOR_G},${COLOR_B},0)`);
+    grad.addColorStop(0, `rgba(${r | 0},${g | 0},${b | 0},${alpha})`);
+    grad.addColorStop(1, `rgba(${r | 0},${g | 0},${b | 0},0)`);
     ctx.fillStyle = grad;
     ctx.beginPath();
     ctx.arc(p.x, p.y, p.r * 2.2, 0, Math.PI * 2);
     ctx.fill();
   }
+}
+
+function clamp(n: number, lo: number, hi: number): number {
+  return n < lo ? lo : n > hi ? hi : n;
 }
