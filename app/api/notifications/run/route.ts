@@ -1,25 +1,40 @@
 import { NextResponse } from "next/server";
 import { runNotificationsWorker } from "@/lib/sms/worker";
 
-// Hit this endpoint from cron (Supabase Scheduled Functions, Vercel Cron, or
-// external cron) to drain the notifications queue. Protect with a shared
-// secret so it can't be invoked anonymously.
-//   header:  Authorization: Bearer <NOTIFICATIONS_WORKER_SECRET>
-// Returns counts of claimed/sent/failed/skipped rows.
+// Drains the notifications queue. Hit from cron (Vercel Cron / Supabase
+// Scheduled Functions / external cron) or manually for ad-hoc runs.
+//
+// AUTH:
+//   - Vercel Cron sends `Authorization: Bearer ${CRON_SECRET}` automatically
+//     when CRON_SECRET is set in the project's env. Vercel reserves this var.
+//   - Manual triggers send `Authorization: Bearer ${NOTIFICATIONS_WORKER_SECRET}`.
+//
+// Either secret is accepted. Both can be set; only one is required. Vercel
+// also sends GET requests for cron — accept GET so the cron header check
+// fires before the worker runs.
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-function unauthorized() {
+function unauthorized(): NextResponse {
   return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 }
 
-export async function POST(req: Request) {
-  const secret = process.env.NOTIFICATIONS_WORKER_SECRET;
-  if (!secret) return NextResponse.json({ error: "worker_secret_not_set" }, { status: 500 });
+async function handle(req: Request): Promise<NextResponse> {
+  const cronSecret = process.env.CRON_SECRET;
+  const workerSecret = process.env.NOTIFICATIONS_WORKER_SECRET;
+  if (!cronSecret && !workerSecret) {
+    return NextResponse.json(
+      { error: "no_auth_secret_configured" },
+      { status: 500 },
+    );
+  }
 
   const auth = req.headers.get("authorization");
-  if (auth !== `Bearer ${secret}`) return unauthorized();
+  const ok =
+    (cronSecret && auth === `Bearer ${cronSecret}`) ||
+    (workerSecret && auth === `Bearer ${workerSecret}`);
+  if (!ok) return unauthorized();
 
   try {
     const result = await runNotificationsWorker();
@@ -29,3 +44,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
+
+export const POST = handle;
+export const GET = handle;

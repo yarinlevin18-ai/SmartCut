@@ -193,7 +193,7 @@ export default function RootLayout({
       <body className="bg-dark text-white font-body">
         <DustLayer />
         <AnimationProvider>
-          <div className="relative z-[2]">{children}</div>
+          {children}
         </AnimationProvider>
         <CookieConsent />
       </body>
