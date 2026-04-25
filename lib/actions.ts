@@ -321,7 +321,6 @@ export async function addGalleryItem(
 ): Promise<ServerActionResult<GalleryPhoto>> {
   try {
     await requireAdmin();
-    console.log(`[Gallery] Adding gallery item: ${storagePath}`);
 
     // Use service role for database operations (bypasses RLS that requires auth)
     const supabase = createServerAdmin();
@@ -339,7 +338,6 @@ export async function addGalleryItem(
     }
 
     const nextOrder = ((maxData?.[0]?.display_order) || 0) + 1;
-    console.log(`[Gallery] Setting display_order to: ${nextOrder}`);
 
     // Insert gallery item
     const { data, error } = await supabase
@@ -360,8 +358,6 @@ export async function addGalleryItem(
       throw error;
     }
 
-    console.log(`[Gallery] Database insert succeeded: ${data.id}`);
-
     const photo: GalleryPhoto = {
       ...data,
       public_url: supabase.storage
@@ -373,7 +369,6 @@ export async function addGalleryItem(
     revalidatePath("/");
     revalidatePath("/gallery");
 
-    console.log(`[Gallery] Item added successfully: ${data.id}`);
     return {
       success: true,
       data: photo,
@@ -481,7 +476,6 @@ export async function uploadGalleryPhoto(
 
     // Convert Base64 to Buffer
     const buffer = Buffer.from(base64Data, "base64");
-    console.log(`[Gallery] Uploading file: ${filename}, size: ${buffer.length} bytes, type: ${contentType}`);
 
     // Upload to storage with elevated permissions
     const { error: uploadError } = await supabase.storage
@@ -496,13 +490,9 @@ export async function uploadGalleryPhoto(
       throw uploadError;
     }
 
-    console.log(`[Gallery] Storage upload succeeded: ${filename}`);
-
     // Get public URL using anon client (safe for client-side use)
     const anonSupabase = await createClient();
     const { data } = anonSupabase.storage.from("gallery").getPublicUrl(filename);
-
-    console.log(`[Gallery] Generated public URL: ${data.publicUrl}`);
 
     return {
       success: true,
