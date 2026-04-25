@@ -40,6 +40,15 @@ export function ServicesPreviewClient({ services }: ServicesPreviewClientProps) 
           "radial-gradient(ellipse at 50% 0%, rgba(201,168,76,0.08) 0%, transparent 60%)",
       }}
     >
+      {/* Top-edge bridge — softens cut from the hero's bottom fade (#0d0d0d) */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 top-0 h-24 z-10"
+        style={{
+          background:
+            "linear-gradient(to bottom, rgba(13,13,13,1) 0%, rgba(0,0,0,0) 100%)",
+        }}
+      />
       <div className="relative z-10 max-w-5xl mx-auto px-6 md:px-10 py-24 md:py-32">
         {/* Eyebrow + heading */}
         <motion.div

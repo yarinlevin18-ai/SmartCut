@@ -54,6 +54,24 @@ export function Reviews() {
         background: "#050505",
       }}
     >
+      {/* Top-edge gradient bridge: fades the previous section into this one */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 top-0 h-24"
+        style={{
+          background:
+            "linear-gradient(to bottom, rgba(13,13,13,1) 0%, rgba(5,5,5,0) 100%)",
+        }}
+      />
+      {/* Bottom-edge gradient bridge: fades into the next section */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 bottom-0 h-24"
+        style={{
+          background:
+            "linear-gradient(to top, rgba(0,0,0,1) 0%, rgba(5,5,5,0) 100%)",
+        }}
+      />
       <div className="relative z-10 max-w-6xl mx-auto px-6 md:px-10 py-24 md:py-32">
         {/* Heading */}
         <motion.div

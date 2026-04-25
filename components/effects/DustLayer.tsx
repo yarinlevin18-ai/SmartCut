@@ -112,8 +112,14 @@ export function DustLayer() {
     <canvas
       ref={canvasRef}
       aria-hidden
-      className="pointer-events-none fixed inset-0 z-[1]"
-      style={{ opacity: 0.85 }}
+      // z-[40] sits above section backgrounds (which paint their own
+      // solid colors and would otherwise obscure a body-level dust layer)
+      // but below the navbar (z-50) and any modals (z-[60]+). The screen
+      // blend mode means the canvas only ADDS light — text underneath is
+      // never darkened, particles just sparkle gently over whatever's
+      // there.
+      className="pointer-events-none fixed inset-0 z-[40]"
+      style={{ opacity: 0.85, mixBlendMode: "screen" }}
     />
   );
 }

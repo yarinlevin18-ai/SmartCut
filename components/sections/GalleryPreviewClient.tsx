@@ -60,6 +60,15 @@ export function GalleryPreviewClient({ photos }: GalleryPreviewClientProps) {
           "radial-gradient(ellipse at 50% 100%, rgba(201,168,76,0.06) 0%, transparent 60%)",
       }}
     >
+      {/* Bottom-edge bridge — fades black → reviews' #050505 */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 bottom-0 h-24 z-10"
+        style={{
+          background:
+            "linear-gradient(to top, rgba(5,5,5,1) 0%, rgba(0,0,0,0) 100%)",
+        }}
+      />
       <div className="relative z-10 max-w-6xl mx-auto px-6 md:px-10 py-24 md:py-32">
         {/* Heading */}
         <motion.div
