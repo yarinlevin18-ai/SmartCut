@@ -46,6 +46,21 @@ export function renderSmsBody(
     case "booking_rescheduled":
       return `היי ${name}, התור שלך עבר ל-${date} בשעה ${time}.${manageSuffix(p)} ${SHOP}`.trim();
 
+    case "booking_pending":
+      // Acknowledgement on form submission. No URL — there's nothing to manage
+      // until the admin acts (cancel-by-token won't fire on pending status).
+      return `תודה ${name}, קיבלנו את הבקשה לתור ל${service} ב-${date} ${time}. נחזור עם אישור בקרוב. ${SHOP}`.trim();
+
+    case "booking_approved":
+      return `היי ${name}, התור שלך ל${service} ב-${date} ${time} אושר!${manageSuffix(p)} ${SHOP}`.trim();
+
+    case "booking_denied":
+      return `היי ${name}, מצטערים — לא נוכל לקבוע את התור ל-${date} ${time}. נשמח לראותך במועד אחר. ${SHOP}`.trim();
+
+    case "booking_alternative_offered":
+      // The manage URL is critical here — it's how the customer accepts/declines.
+      return `היי ${name}, מועד חלופי הוצע: ${date} בשעה ${time}.${manageSuffix(p)} ${SHOP}`.trim();
+
     default: {
       const exhaustive: never = template;
       throw new Error(`Unknown template: ${exhaustive as string}`);

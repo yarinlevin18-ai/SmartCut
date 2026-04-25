@@ -28,8 +28,10 @@ export interface GalleryPhoto extends GalleryItem {
 }
 
 export type BookingStatus =
+  | "pending"
   | "confirmed"
   | "cancelled"
+  | "denied"
   | "completed"
   | "no_show";
 
@@ -48,6 +50,7 @@ export interface Booking {
   notes?: string;
   created_at: string;
   manage_token: string;
+  alt_offered_at: string | null;
   service?: Service;
 }
 
@@ -90,7 +93,11 @@ export type NotificationTemplate =
   | "booking_confirmed"
   | "booking_cancelled"
   | "booking_reminder_24h"
-  | "booking_rescheduled";
+  | "booking_rescheduled"
+  | "booking_pending"
+  | "booking_approved"
+  | "booking_denied"
+  | "booking_alternative_offered";
 export type NotificationStatus = "queued" | "sending" | "sent" | "failed" | "skipped";
 export type NotificationLocale = "he" | "en";
 
