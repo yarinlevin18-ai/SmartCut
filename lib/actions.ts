@@ -733,6 +733,97 @@ export async function deleteBooking(id: string): Promise<ServerActionResult> {
 }
 
 // ============================================================================
+// SELF-SERVICE CANCEL (public, token-gated)
+// See: docs/adr/0003-self-service-cancel.md
+// ============================================================================
+
+export type ManageBookingView = {
+  booking_id: string;
+  full_name: string;
+  phone: string;
+  slot_start: string | null;
+  slot_end: string | null;
+  service_id: string | null;
+  service_name: string | null;
+  status: "confirmed" | "cancelled" | "completed" | "no_show";
+};
+
+export type CancelByTokenStatus =
+  | "ok"
+  | "not_found"
+  | "already_cancelled"
+  | "too_late"
+  | "slot_in_past";
+
+/** Read booking details by opaque manage token. Returns null when token unknown. */
+export async function getBookingByToken(
+  token: string
+): Promise<ManageBookingView | null> {
+  if (!UUID_RE.test(token)) return null;
+  const supabase = createAnonClient();
+  const { data, error } = await supabase
+    .rpc("get_booking_by_token", { p_token: token })
+    .maybeSingle();
+  if (error || !data) return null;
+  return data as ManageBookingView;
+}
+
+/**
+ * Cancel a booking via the public manage link. Calls cancel_booking_by_token RPC
+ * (SECURITY DEFINER, bypasses RLS for anon, enforces 24h cutoff in SQL). On 'ok',
+ * fires the cancellation SMS via the existing enqueue helper.
+ */
+export async function cancelBookingByToken(
+  token: string
+): Promise<{ status: CancelByTokenStatus; slot_start: string | null }> {
+  if (!UUID_RE.test(token)) return { status: "not_found", slot_start: null };
+
+  const supabase = createAnonClient();
+  const { data, error } = await supabase
+    .rpc("cancel_booking_by_token", { p_token: token })
+    .maybeSingle();
+
+  if (error || !data) return { status: "not_found", slot_start: null };
+
+  const result = data as {
+    status: CancelByTokenStatus;
+    booking_id: string | null;
+    slot_start: string | null;
+    slot_end: string | null;
+    service_id: string | null;
+    full_name: string | null;
+    phone: string | null;
+  };
+
+  if (result.status === "ok" && result.booking_id && result.slot_start && result.slot_end && result.phone) {
+    // Fetch service name + duration for the SMS payload (RPC didn't return them).
+    const admin = createServerAdmin();
+    const { data: svc } = result.service_id
+      ? await admin
+          .from("services")
+          .select("name, duration_minutes")
+          .eq("id", result.service_id)
+          .maybeSingle()
+      : { data: null as { name: string; duration_minutes: number } | null };
+
+    await enqueueBookingCancelled({
+      booking_id: result.booking_id,
+      customer_name: result.full_name ?? "",
+      phone: result.phone,
+      slot_start: result.slot_start,
+      slot_end: result.slot_end,
+      service_name: svc?.name ?? "",
+      duration_minutes: svc?.duration_minutes ?? 0,
+    });
+
+    revalidatePath("/admin/bookings");
+    revalidatePath("/admin/notifications");
+  }
+
+  return { status: result.status, slot_start: result.slot_start };
+}
+
+// ============================================================================
 // AVAILABILITY (weekly schedule + blocked dates)
 // ============================================================================
 
