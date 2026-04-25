@@ -10,6 +10,38 @@ export default function BookingsPage() {
   const [loading, setLoading] = useState(true);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [copiedToken, setCopiedToken] = useState<string | null>(null);
+
+  const manageUrlFor = (token: string): string => {
+    const origin =
+      typeof window !== "undefined"
+        ? window.location.origin
+        : "https://carmelis.co.il";
+    return `${origin}/booking/manage/${token}`;
+  };
+
+  const copyManageLink = async (token: string): Promise<void> => {
+    try {
+      await navigator.clipboard.writeText(manageUrlFor(token));
+      setCopiedToken(token);
+      setTimeout(
+        () => setCopiedToken((cur) => (cur === token ? null : cur)),
+        1500,
+      );
+    } catch {
+      /* ignore */
+    }
+  };
+
+  // A booking is "manageable" by the customer iff status is confirmed AND
+  // slot_start is more than 24h out (matches the cancel cutoff in SQL).
+  const isManageable = (booking: Booking): boolean => {
+    if (booking.status !== "confirmed") return false;
+    if (!booking.slot_start) return false;
+    const hoursOut =
+      (new Date(booking.slot_start).getTime() - Date.now()) / 3_600_000;
+    return hoursOut >= 24;
+  };
 
   useEffect(() => {
     loadBookings();
@@ -241,6 +273,80 @@ export default function BookingsPage() {
                               value={formatDate(booking.created_at)}
                             />
                           </div>
+
+                          {isManageable(booking) && (
+                            <div>
+                              <div
+                                className="font-label uppercase text-gold-accent mb-2"
+                                style={{
+                                  fontSize: 10,
+                                  fontWeight: 600,
+                                  letterSpacing: "0.32em",
+                                }}
+                              >
+                                Manage Link · קישור ניהול
+                              </div>
+                              <div className="flex items-stretch gap-2">
+                                <code
+                                  className="flex-1 font-body text-white/70 px-3 py-2 truncate select-all"
+                                  style={{
+                                    fontSize: 11,
+                                    fontWeight: 300,
+                                    background: "rgba(255,255,255,0.02)",
+                                    border: "1px solid rgba(255,255,255,0.06)",
+                                    fontFamily:
+                                      "ui-monospace, SFMono-Regular, Menlo, monospace",
+                                  }}
+                                  dir="ltr"
+                                  title={manageUrlFor(booking.manage_token)}
+                                >
+                                  {manageUrlFor(booking.manage_token)}
+                                </code>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    copyManageLink(booking.manage_token);
+                                  }}
+                                  className="font-label uppercase transition-all"
+                                  style={{
+                                    border:
+                                      copiedToken === booking.manage_token
+                                        ? "1px solid rgba(74,222,128,0.5)"
+                                        : "1px solid rgba(201,168,76,0.4)",
+                                    color:
+                                      copiedToken === booking.manage_token
+                                        ? "#4ade80"
+                                        : "#c9a84c",
+                                    background:
+                                      copiedToken === booking.manage_token
+                                        ? "rgba(74,222,128,0.08)"
+                                        : "transparent",
+                                    fontSize: 10,
+                                    fontWeight: 600,
+                                    padding: "0 16px",
+                                    borderRadius: 0,
+                                    letterSpacing: "0.24em",
+                                    minWidth: 88,
+                                  }}
+                                >
+                                  {copiedToken === booking.manage_token
+                                    ? "הועתק"
+                                    : "העתק"}
+                                </button>
+                              </div>
+                              <p
+                                className="font-body text-white/40 mt-2"
+                                style={{
+                                  fontSize: 11,
+                                  fontWeight: 300,
+                                  lineHeight: 1.6,
+                                }}
+                              >
+                                שלח ללקוח (WhatsApp/SMS) — מאפשר ביטול עצמי עד 24 שעות לפני המועד.
+                              </p>
+                            </div>
+                          )}
 
                           {booking.notes && (
                             <div>

@@ -47,6 +47,7 @@ export interface Booking {
   preferred_time: string | null;
   notes?: string;
   created_at: string;
+  manage_token: string;
   service?: Service;
 }
 
