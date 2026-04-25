@@ -102,17 +102,22 @@ export async function runNotificationsWorker(): Promise<WorkerRunResult> {
           .eq("id", row.id);
         result.skipped++;
       } else {
+        // Include Inforu RequestId in the error column when present — it's the
+        // single most useful piece of info if you have to open a support ticket.
+        const errWithRid = send.requestId
+          ? `${send.error} [rid:${send.requestId}]`
+          : send.error;
         await admin
           .from("notifications")
           .update({
             status: "failed",
             attempts: nextAttempts,
             provider: send.provider,
-            error: send.error,
+            error: errWithRid,
           })
           .eq("id", row.id);
         result.failed++;
-        result.errors.push({ id: row.id, error: send.error });
+        result.errors.push({ id: row.id, error: errWithRid });
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
