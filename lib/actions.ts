@@ -5,6 +5,12 @@ import { formatInTimeZone } from "date-fns-tz";
 import { createClient, createAnonClient, createServerAdmin } from "./supabase";
 import { requireAdmin } from "./auth";
 import {
+  createEventForBooking,
+  updateEventForBooking,
+  deleteEvent as gcalDeleteEvent,
+  type BookingForGcal,
+} from "./gcal";
+import {
   enqueueBookingCancelled,
   enqueueBookingRescheduled,
   enqueueBookingPending,
@@ -711,7 +717,7 @@ export async function cancelBooking(id: string): Promise<ServerActionResult> {
       .update({ status: "cancelled" })
       .eq("id", id)
       .neq("status", "cancelled")
-      .select("id, full_name, phone, slot_start, slot_end, service_id, manage_token, services(name, duration_minutes)")
+      .select("id, full_name, phone, slot_start, slot_end, service_id, manage_token, gcal_event_id, services(name, duration_minutes)")
       .single();
 
     if (error) throw error;
@@ -729,6 +735,14 @@ export async function cancelBooking(id: string): Promise<ServerActionResult> {
         duration_minutes: (svc?.duration_minutes as number | undefined) ?? 0,
         manage_token: data.manage_token as string,
       });
+    }
+
+    // Phase 7: remove the corresponding Google Calendar event.
+    if (data.gcal_event_id) {
+      const removed = await gcalDeleteEvent(data.gcal_event_id as string);
+      if (removed) {
+        await supabase.from("bookings").update({ gcal_event_id: null }).eq("id", data.id);
+      }
     }
 
     revalidatePath("/admin/bookings");
@@ -784,6 +798,22 @@ export async function approveBooking(id: string): Promise<ServerActionResult> {
         duration_minutes: (svc?.duration_minutes as number | undefined) ?? 0,
         manage_token: data.manage_token as string,
       });
+
+      // Phase 7: mirror to Google Calendar (fire-and-forget; never blocks).
+      const gcalCtx: BookingForGcal = {
+        id: data.id,
+        full_name: data.full_name,
+        phone: data.phone,
+        notes: null,
+        slot_start: data.slot_start,
+        slot_end: data.slot_end,
+        service_name: (svc?.name as string | undefined) ?? "",
+        manage_token: data.manage_token as string,
+      };
+      const eventId = await createEventForBooking(gcalCtx);
+      if (eventId) {
+        await supabase.from("bookings").update({ gcal_event_id: eventId }).eq("id", data.id);
+      }
     }
 
     revalidatePath("/admin/bookings");
@@ -1011,6 +1041,19 @@ export async function cancelBookingByToken(
       manage_token: token,
     });
 
+    // Phase 7: remove the Google Calendar event if there was one.
+    const { data: row } = await admin
+      .from("bookings")
+      .select("gcal_event_id")
+      .eq("id", result.booking_id)
+      .maybeSingle();
+    if (row?.gcal_event_id) {
+      const removed = await gcalDeleteEvent(row.gcal_event_id as string);
+      if (removed) {
+        await admin.from("bookings").update({ gcal_event_id: null }).eq("id", result.booking_id);
+      }
+    }
+
     revalidatePath("/admin/bookings");
     revalidatePath("/admin/notifications");
   }
@@ -1102,6 +1145,33 @@ export async function rescheduleBookingByToken(
       manage_token: token,
     });
 
+    // Phase 7: update the existing Google Calendar event (if any) to the
+    // new slot. If the booking has no event yet (e.g. legacy or integration
+    // wasn't connected at approval), create one now.
+    const { data: row } = await admin
+      .from("bookings")
+      .select("gcal_event_id")
+      .eq("id", result.booking_id)
+      .maybeSingle();
+    const gcalCtx: BookingForGcal = {
+      id: result.booking_id,
+      full_name: result.full_name ?? "",
+      phone: result.phone,
+      notes: null,
+      slot_start: result.new_slot_start,
+      slot_end: result.new_slot_end,
+      service_name: svc?.name ?? "",
+      manage_token: token,
+    };
+    if (row?.gcal_event_id) {
+      await updateEventForBooking(row.gcal_event_id as string, gcalCtx);
+    } else {
+      const eventId = await createEventForBooking(gcalCtx);
+      if (eventId) {
+        await admin.from("bookings").update({ gcal_event_id: eventId }).eq("id", result.booking_id);
+      }
+    }
+
     revalidatePath("/admin/bookings");
     revalidatePath("/admin/notifications");
   }
@@ -1185,8 +1255,38 @@ export async function customerConfirmAlternativeByToken(
 
     if (decision === "accept") {
       await enqueueBookingApproved(ctx);
+      // Phase 7: alternative-offered bookings have status=pending so they
+      // never had a gcal event yet. Create one now that the customer accepted.
+      const gcalCtx: BookingForGcal = {
+        id: result.booking_id,
+        full_name: result.full_name ?? "",
+        phone: result.phone,
+        notes: null,
+        slot_start: result.slot_start,
+        slot_end: result.slot_end,
+        service_name: svc?.name ?? "",
+        manage_token: token,
+      };
+      const eventId = await createEventForBooking(gcalCtx);
+      if (eventId) {
+        await admin.from("bookings").update({ gcal_event_id: eventId }).eq("id", result.booking_id);
+      }
     } else {
       await enqueueBookingCancelled(ctx);
+      // No gcal event to delete (alt-offered never created one), but be
+      // defensive in case the row had one from a previous accept that got
+      // un-done somehow.
+      const { data: row } = await admin
+        .from("bookings")
+        .select("gcal_event_id")
+        .eq("id", result.booking_id)
+        .maybeSingle();
+      if (row?.gcal_event_id) {
+        const removed = await gcalDeleteEvent(row.gcal_event_id as string);
+        if (removed) {
+          await admin.from("bookings").update({ gcal_event_id: null }).eq("id", result.booking_id);
+        }
+      }
     }
 
     revalidatePath("/admin/bookings");
