@@ -33,7 +33,7 @@ export default function TermsPage() {
           <strong>&ldquo;המשתמש&rdquo;</strong> — כל אדם הגולש באתר או מזמין
           דרכו שירות.{" "}
           <strong>&ldquo;האתר&rdquo;</strong> — האתר בכתובת{" "}
-          <a href="https://www.carmelis-studio.com">carmelis-studio.com</a>.
+          <a href="https://carmelis.co.il">carmelis.co.il</a>.
         </p>
 
         <h2>הזמנת תור</h2>

@@ -9,6 +9,6 @@ export default function robots(): MetadataRoute.Robots {
         disallow: ["/admin", "/admin/"],
       },
     ],
-    sitemap: "https://www.carmelis-studio.com/sitemap.xml",
+    sitemap: "https://carmelis.co.il/sitemap.xml",
   };
 }

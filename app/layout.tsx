@@ -35,7 +35,7 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://www.carmelis-studio.com"),
+  metadataBase: new URL("https://carmelis.co.il"),
   title: {
     default: "קרמליס סטודיו | גילוח וטיפוח בתל אביב",
     template: "%s | קרמליס סטודיו",
@@ -56,7 +56,7 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     locale: "he_IL",
-    url: "https://www.carmelis-studio.com",
+    url: "https://carmelis.co.il",
     siteName: "קרמליס סטודיו",
     title: "קרמליס סטודיו | גילוח וטיפוח בתל אביב",
     description:
@@ -81,7 +81,7 @@ export const metadata: Metadata = {
     ],
   },
   alternates: {
-    canonical: "https://www.carmelis-studio.com",
+    canonical: "https://carmelis.co.il",
   },
   robots: {
     index: true,
@@ -114,11 +114,11 @@ export default function RootLayout({
   const jsonLdData = {
     "@context": "https://schema.org",
     "@type": "HairSalon",
-    "@id": "https://www.carmelis-studio.com/#business",
+    "@id": "https://carmelis.co.il/#business",
     name: "קרמליס סטודיו",
     description:
       "סטודיו גברים פרימיום בתל אביב. גילוח קלאסי, עיצוב זקן ושפם, וטיפול שיער.",
-    url: "https://www.carmelis-studio.com",
+    url: "https://carmelis.co.il",
     image: "https://static.wixstatic.com/media/3d7d7e_c3c9c7388d8e45c9aa202d3e9a91c3b4~mv2.png",
     telephone: "+972-52-455-0069",
     priceRange: "₪₪",
