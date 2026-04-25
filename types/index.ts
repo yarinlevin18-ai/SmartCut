@@ -89,7 +89,8 @@ export type NotificationChannel = "sms";
 export type NotificationTemplate =
   | "booking_confirmed"
   | "booking_cancelled"
-  | "booking_reminder_24h";
+  | "booking_reminder_24h"
+  | "booking_rescheduled";
 export type NotificationStatus = "queued" | "sending" | "sent" | "failed" | "skipped";
 export type NotificationLocale = "he" | "en";
 

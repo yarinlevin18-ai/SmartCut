@@ -27,6 +27,7 @@ const TEMPLATE_LABELS: Record<NotificationTemplate, string> = {
   booking_confirmed: "אישור תור",
   booking_reminder_24h: "תזכורת 24 שעות",
   booking_cancelled: "ביטול תור",
+  booking_rescheduled: "שינוי מועד",
 };
 
 const STATUS_COLOR: Record<NotificationStatus, string> = {

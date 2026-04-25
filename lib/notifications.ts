@@ -139,3 +139,67 @@ export async function enqueueBookingCancelled(
     return { enqueued: 0, skippedReminders: 0 };
   }
 }
+
+/**
+ * On reschedule: enqueue a 'booking_rescheduled' SMS for the NEW slot, skip the
+ * still-queued old reminder, and enqueue a fresh reminder at new_slot_start - 24h.
+ *
+ * The ctx passed here describes the NEW slot. The caller is responsible for
+ * passing the new slot_start/slot_end (the RPC return supplies these).
+ */
+export async function enqueueBookingRescheduled(
+  ctx: NotificationBookingContext
+): Promise<{ enqueued: number; skippedReminders: number }> {
+  const payload = buildPayload(ctx);
+  const now = new Date().toISOString();
+  const reminderAt = reminderSendAt(ctx.slot_start);
+  const reminderIsFuture = new Date(reminderAt).getTime() > Date.now();
+
+  const rows: EnqueueRow[] = [
+    {
+      booking_id: ctx.booking_id,
+      channel: "sms",
+      template: "booking_rescheduled",
+      recipient: ctx.phone,
+      locale: "he",
+      payload,
+      scheduled_for: now,
+    },
+  ];
+  if (reminderIsFuture) {
+    rows.push({
+      booking_id: ctx.booking_id,
+      channel: "sms",
+      template: "booking_reminder_24h",
+      recipient: ctx.phone,
+      locale: "he",
+      payload,
+      scheduled_for: reminderAt,
+    });
+  }
+
+  try {
+    const admin = createServerAdmin();
+    // Order matters: skip the OLD reminder FIRST, then insert the new rows.
+    // If we paralleled these, the skip's WHERE (template=reminder AND status=queued)
+    // would also catch the freshly-inserted new reminder.
+    const skipRes = await admin
+      .from("notifications")
+      .update({ status: "skipped", error: "booking_rescheduled" })
+      .eq("booking_id", ctx.booking_id)
+      .eq("template", "booking_reminder_24h")
+      .eq("status", "queued")
+      .select("id");
+    const insertRes = await admin.from("notifications").insert(rows);
+    if (insertRes.error) {
+      console.error("[notifications] enqueue rescheduled failed", insertRes.error.message);
+    }
+    return {
+      enqueued: insertRes.error ? 0 : rows.length,
+      skippedReminders: skipRes.data?.length ?? 0,
+    };
+  } catch (err) {
+    console.error("[notifications] enqueue rescheduled threw", err instanceof Error ? err.message : err);
+    return { enqueued: 0, skippedReminders: 0 };
+  }
+}

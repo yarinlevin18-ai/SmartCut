@@ -33,6 +33,9 @@ export function renderSmsBody(
     case "booking_cancelled":
       return `התור שלך ל-${date} ${time} בוטל. לקביעת מועד חדש תוכל להיכנס לאתר. ${SHOP}`.trim();
 
+    case "booking_rescheduled":
+      return `היי ${name}, התור שלך עבר ל-${date} בשעה ${time}. ${SHOP}`.trim();
+
     default: {
       const exhaustive: never = template;
       throw new Error(`Unknown template: ${exhaustive as string}`);

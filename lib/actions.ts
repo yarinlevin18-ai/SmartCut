@@ -4,7 +4,7 @@ import { revalidatePath, revalidateTag, unstable_cache } from "next/cache";
 import { formatInTimeZone } from "date-fns-tz";
 import { createClient, createAnonClient, createServerAdmin } from "./supabase";
 import { requireAdmin } from "./auth";
-import { enqueueBookingCreated, enqueueBookingCancelled } from "./notifications";
+import { enqueueBookingCreated, enqueueBookingCancelled, enqueueBookingRescheduled } from "./notifications";
 import type {
   Service,
   GalleryPhoto,
@@ -811,6 +811,100 @@ export async function cancelBookingByToken(
   }
 
   return { status: result.status, slot_start: result.slot_start };
+}
+
+export type RescheduleByTokenStatus =
+  | "ok"
+  | "not_found"
+  | "already_cancelled"
+  | "slot_in_past"
+  | "too_late"
+  | "new_slot_in_past"
+  | "new_slot_too_soon"
+  | "invalid_slot"
+  | "slot_unavailable";
+
+/**
+ * Reschedule a booking via the public manage link. Calls reschedule_booking_by_token
+ * RPC (SECURITY DEFINER, bypasses RLS for anon, enforces 24h cutoff in SQL on both
+ * old and new slots, GIST exclusion catches overlaps). On 'ok', skips the queued
+ * old reminder and enqueues a fresh booking_rescheduled SMS + new reminder.
+ */
+export async function rescheduleBookingByToken(
+  token: string,
+  newSlotStartIso: string
+): Promise<{
+  status: RescheduleByTokenStatus;
+  new_slot_start: string | null;
+  new_slot_end: string | null;
+}> {
+  if (!UUID_RE.test(token)) {
+    return { status: "not_found", new_slot_start: null, new_slot_end: null };
+  }
+  // Cheap client-side sanity check; the RPC validates authoritatively.
+  const parsed = new Date(newSlotStartIso);
+  if (Number.isNaN(parsed.getTime())) {
+    return { status: "invalid_slot", new_slot_start: null, new_slot_end: null };
+  }
+
+  const supabase = createAnonClient();
+  const { data, error } = await supabase
+    .rpc("reschedule_booking_by_token", {
+      p_token: token,
+      p_new_slot_start: newSlotStartIso,
+    })
+    .maybeSingle();
+
+  if (error || !data) {
+    return { status: "not_found", new_slot_start: null, new_slot_end: null };
+  }
+
+  const result = data as {
+    status: RescheduleByTokenStatus;
+    booking_id: string | null;
+    old_slot_start: string | null;
+    new_slot_start: string | null;
+    new_slot_end: string | null;
+    service_id: string | null;
+    full_name: string | null;
+    phone: string | null;
+  };
+
+  if (
+    result.status === "ok" &&
+    result.booking_id &&
+    result.new_slot_start &&
+    result.new_slot_end &&
+    result.phone
+  ) {
+    const admin = createServerAdmin();
+    const { data: svc } = result.service_id
+      ? await admin
+          .from("services")
+          .select("name, duration_minutes")
+          .eq("id", result.service_id)
+          .maybeSingle()
+      : { data: null as { name: string; duration_minutes: number } | null };
+
+    await enqueueBookingRescheduled({
+      booking_id: result.booking_id,
+      customer_name: result.full_name ?? "",
+      phone: result.phone,
+      slot_start: result.new_slot_start,
+      slot_end: result.new_slot_end,
+      service_name: svc?.name ?? "",
+      duration_minutes: svc?.duration_minutes ?? 0,
+    });
+
+    revalidatePath("/admin/bookings");
+    revalidatePath("/admin/notifications");
+  }
+
+  return {
+    status: result.status,
+    new_slot_start: result.new_slot_start,
+    new_slot_end: result.new_slot_end,
+  };
 }
 
 // ============================================================================
