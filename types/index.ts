@@ -48,6 +48,19 @@ export interface ProductInput {
   is_active?: boolean;
 }
 
+export interface OAuthToken {
+  id: string;
+  provider: "google_calendar";
+  account_email: string | null;
+  access_token: string;
+  refresh_token: string;
+  expires_at: string;
+  scope: string | null;
+  calendar_id: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export type BookingStatus =
   | "pending"
   | "confirmed"
@@ -72,6 +85,7 @@ export interface Booking {
   created_at: string;
   manage_token: string;
   alt_offered_at: string | null;
+  gcal_event_id: string | null;
   service?: Service;
 }
 
