@@ -11,6 +11,15 @@ interface ManagePageProps {
   params: Promise<{ token: string }>;
 }
 
+const STATUS_LABEL_HE: Record<string, string> = {
+  pending: "ממתין לאישור",
+  confirmed: "מאושר",
+  cancelled: "בוטל",
+  denied: "נדחה",
+  completed: "הושלם",
+  no_show: "לא הגיע",
+};
+
 export default async function ManageBookingPage({ params }: ManagePageProps) {
   const { token } = await params;
   const booking = await getBookingByToken(token);
@@ -29,6 +38,24 @@ export default async function ManageBookingPage({ params }: ManagePageProps) {
     : null;
   const cutoffPassed = hoursUntil !== null && hoursUntil < 24;
   const slotInPast = hoursUntil !== null && hoursUntil <= 0;
+
+  // Phase 5 distinguishers
+  const isAlternativeOffered =
+    booking.status === "pending" && !!booking.alt_offered_at;
+  const isFreshPending =
+    booking.status === "pending" && !booking.alt_offered_at;
+
+  // Heading text picks the right tone for each state.
+  const heading =
+    booking.status === "cancelled"
+      ? "התור בוטל"
+      : booking.status === "denied"
+        ? "הבקשה נדחתה"
+        : isAlternativeOffered
+          ? "הוצע מועד חלופי"
+          : isFreshPending
+            ? "הבקשה התקבלה"
+            : "התור שלך";
 
   return (
     <>
@@ -56,18 +83,20 @@ export default async function ManageBookingPage({ params }: ManagePageProps) {
             className="font-display text-white mb-8"
             style={{ fontSize: "clamp(28px, 4vw, 38px)", lineHeight: 1.1 }}
           >
-            {booking.status === "cancelled" ? "התור בוטל" : "התור שלך"}
+            {heading}
           </h1>
 
           <dl className="space-y-3 mb-8 font-body text-white/85" style={{ fontSize: 14 }}>
             <Row label="לקוח" value={booking.full_name} />
             <Row label="שירות" value={booking.service_name ?? "—"} />
-            {slotDate && <Row label="תאריך" value={slotDate} />}
+            {slotDate && (
+              <Row
+                label={isAlternativeOffered ? "מועד חלופי שהוצע" : "תאריך"}
+                value={slotDate}
+              />
+            )}
             {slotTime && <Row label="שעה" value={slotTime} />}
-            <Row
-              label="סטטוס"
-              value={booking.status === "cancelled" ? "בוטל" : "מאושר"}
-            />
+            <Row label="סטטוס" value={STATUS_LABEL_HE[booking.status] ?? booking.status} />
           </dl>
 
           <ManageBookingClient
@@ -76,6 +105,8 @@ export default async function ManageBookingPage({ params }: ManagePageProps) {
             cutoffPassed={cutoffPassed}
             slotInPast={slotInPast}
             serviceId={booking.service_id}
+            isAlternativeOffered={isAlternativeOffered}
+            isFreshPending={isFreshPending}
           />
         </div>
       </main>
