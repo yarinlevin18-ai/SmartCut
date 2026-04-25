@@ -121,6 +121,43 @@ export function AdminSidebar() {
         })}
       </nav>
 
+      {/* View site — quick jump to the public-facing landing page. Opens in
+          a new tab so the admin keeps their place in the dashboard. */}
+      <div
+        className="px-3 pb-3"
+        style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}
+      >
+        <Link
+          href="/"
+          target="_blank"
+          rel="noopener"
+          className="block group"
+        >
+          <div
+            className="flex items-center justify-between px-4 py-3 transition-all hover:bg-white/5"
+            style={{ borderLeft: "2px solid transparent" }}
+          >
+            <span
+              className="font-body text-white/70 group-hover:text-gold-accent transition-colors flex items-center gap-2"
+              style={{ fontSize: 14, fontWeight: 400 }}
+            >
+              צפה באתר
+              <span aria-hidden style={{ fontSize: 11 }}>↗</span>
+            </span>
+            <span
+              className="font-label uppercase text-white/30 group-hover:text-gold-accent/70 transition-colors"
+              style={{
+                fontSize: 9,
+                fontWeight: 600,
+                letterSpacing: "0.28em",
+              }}
+            >
+              View site
+            </span>
+          </div>
+        </Link>
+      </div>
+
       {/* User + logout */}
       <div
         className="px-6 py-5"
