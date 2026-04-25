@@ -2,10 +2,10 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase";
 import { getBookings } from "@/lib/actions";
-import { getGcalStatus, listUpcomingEvents, getPrimaryCalendarId } from "@/lib/gcal";
+import { getGcalStatus } from "@/lib/gcal";
 import { GcalPanel } from "./GcalPanel";
 import { TodaySchedule } from "./TodaySchedule";
-import { CalendarView } from "./CalendarView";
+import { BookingsCalendar } from "./BookingsCalendar";
 import type { User } from "@supabase/supabase-js";
 
 export const dynamic = "force-dynamic";
@@ -58,13 +58,6 @@ export default async function AdminPage() {
     getGcalStatus(),
   ]);
 
-  // Fetch the calendar surface in parallel — only when connected, to avoid
-  // pointless API calls on every dashboard render for accounts that haven't
-  // wired the integration yet.
-  const [upcomingEvents, calendarId] = gcalStatus.connected
-    ? await Promise.all([listUpcomingEvents(7, 50), getPrimaryCalendarId()])
-    : [null, null];
-
   const bookings =
     bookingsRes.success && bookingsRes.data ? bookingsRes.data : [];
   const recentBookings = bookings.slice(0, 5);
@@ -94,22 +87,11 @@ export default async function AdminPage() {
         </h1>
       </div>
 
-      {/* Today's schedule — primary daily-driver view (DB-backed). */}
+      {/* Today's schedule — focused, time-ordered list of TODAY's bookings. */}
       <TodaySchedule bookings={bookings} />
 
-      {/* Google Calendar integration panel (Phase 7) */}
-      <GcalPanel
-        configured={gcalStatus.configured}
-        connected={gcalStatus.connected}
-        accountEmail={gcalStatus.account_email}
-      />
-
-      {/* Next 7 days from Google Calendar — only renders when connected. */}
-      <CalendarView
-        events={upcomingEvents}
-        calendarId={calendarId}
-        connected={gcalStatus.connected}
-      />
+      {/* This week — calendar grid of bookings only (our data, not GCal). */}
+      <BookingsCalendar bookings={bookings} />
 
       {/* Recent bookings */}
       <div
@@ -197,6 +179,18 @@ export default async function AdminPage() {
             ))}
           </ul>
         )}
+      </div>
+
+      {/* Google Calendar sync status — relegated to the bottom. The integration
+          mirrors approved bookings to the barber's Google Calendar; the events
+          are viewed on the barber's phone, not on this dashboard. The panel
+          here is just for connect / disconnect management. */}
+      <div className="mt-12">
+        <GcalPanel
+          configured={gcalStatus.configured}
+          connected={gcalStatus.connected}
+          accountEmail={gcalStatus.account_email}
+        />
       </div>
     </div>
   );
