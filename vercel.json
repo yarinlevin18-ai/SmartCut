@@ -1,16 +1,12 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "nextjs",
-
-  "//": "Cron drains the notifications queue. Vercel hits the path with an Authorization header derived from CRON_SECRET (Vercel's reserved env var). The route also accepts NOTIFICATIONS_WORKER_SECRET — set BOTH to the same value in Vercel for cron + manual triggers to work, or wrap the worker route to accept either.",
   "crons": [
     {
       "path": "/api/notifications/run",
       "schedule": "* * * * *"
     }
   ],
-
-  "//headers": "Defense-in-depth security headers. The X-Frame-Options + Content-Security-Policy 'frame-ancestors' pair blocks clickjacking. Strict-Transport-Security forces HTTPS for a year (subdomains too). X-Content-Type-Options stops MIME sniffing. Referrer-Policy keeps booking-token URLs out of cross-origin referrer logs (important for /booking/manage/[token]). Permissions-Policy denies sensors we never use.",
   "headers": [
     {
       "source": "/(.*)",
