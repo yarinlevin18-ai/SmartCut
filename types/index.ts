@@ -27,6 +27,27 @@ export interface GalleryPhoto extends GalleryItem {
   public_url: string;
 }
 
+export interface Product {
+  id: string;
+  name: string;
+  description: string | null;
+  /** Numeric ILS amount; null for "ask in-store" / variable pricing. */
+  price: number | null;
+  image_url: string | null;
+  display_order: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProductInput {
+  name: string;
+  description?: string | null;
+  price?: number | null;
+  image_url?: string | null;
+  is_active?: boolean;
+}
+
 export type BookingStatus =
   | "pending"
   | "confirmed"
