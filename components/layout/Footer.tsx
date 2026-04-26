@@ -10,12 +10,24 @@ export function Footer() {
   const bitpayUrl = process.env.NEXT_PUBLIC_BITPAY_URL ?? "#";
 
   const [phone, setPhone] = useState("052-455-0069");
+  const [address, setAddress] = useState<string>("");
 
   useEffect(() => {
     getSiteContent("phone").then((r) => {
       if (r.success && r.data) setPhone(r.data);
     });
+    getSiteContent("address").then((r) => {
+      if (r.success && r.data) setAddress(r.data);
+    });
   }, []);
+
+  // Waze deep link. ?q=<address> opens Waze with the address as a search
+  // query — works on mobile (Waze app) and desktop (Waze web). Empty
+  // address falls back to a Carmelis-Studio search so the button never
+  // links to nothing.
+  const wazeUrl = address
+    ? `https://waze.com/ul?q=${encodeURIComponent(address)}&navigate=yes`
+    : "https://waze.com/ul?q=Carmelis%20Studio&navigate=yes";
 
   return (
     <footer
@@ -114,6 +126,30 @@ export function Footer() {
                 >
                   {phone}
                 </a>
+              )}
+              {address && (
+                <div className="flex flex-col gap-1.5">
+                  <span
+                    className="font-body text-white/70"
+                    style={{ fontSize: 13, fontWeight: 300, lineHeight: 1.5 }}
+                  >
+                    {address}
+                  </span>
+                  <a
+                    href={wazeUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-label uppercase text-gold-accent hover:text-gold-light transition-colors inline-flex items-center gap-1.5 self-center md:self-start"
+                    style={{
+                      fontSize: 10,
+                      fontWeight: 600,
+                      letterSpacing: "0.28em",
+                    }}
+                  >
+                    <span aria-hidden style={{ fontSize: 11 }}>↗</span>
+                    נווט ב-Waze
+                  </a>
+                </div>
               )}
               <a
                 href={instagramUrl}

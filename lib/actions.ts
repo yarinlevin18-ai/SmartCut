@@ -104,7 +104,12 @@ export async function updateSiteContent(
 ): Promise<ServerActionResult> {
   try {
     await requireAdmin();
-    const supabase = await createClient();
+    // Service-role write — site_content has no anon/authenticated INSERT
+    // policy in migration 001, only UPDATE/DELETE. First save of a key
+    // (no existing row) is an INSERT under upsert semantics and gets
+    // RLS-blocked when using the cookie-based SSR client. Same pattern as
+    // createBooking. requireAdmin() above is the actual auth gate.
+    const supabase = createServerAdmin();
     const { error } = await supabase.from("site_content").upsert(
       {
         key,
