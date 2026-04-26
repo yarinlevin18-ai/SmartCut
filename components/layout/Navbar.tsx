@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
 import { useState } from "react";
 import { usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
@@ -19,33 +18,15 @@ export function Navbar() {
   ];
 
   return (
-    <header className="sticky top-0 z-50 bg-black/80 backdrop-blur-md border-b border-white/5">
-      <div className="max-w-7xl mx-auto px-5 md:px-8 py-4 flex items-center justify-between gap-4">
-        {/* Logo + wordmark (right in RTL) */}
-        <Link
-          href="/"
-          className="flex items-center gap-3 shrink-0"
-          aria-label="קרמליס סטודיו — דף הבית"
-        >
-          <Image
-            src="https://static.wixstatic.com/media/3d7d7e_c3c9c7388d8e45c9aa202d3e9a91c3b4~mv2.png"
-            alt=""
-            width={36}
-            height={36}
-            className="w-9 h-9"
-            priority
-          />
-          <span
-            className="font-display text-gold-accent hidden sm:inline"
-            style={{ fontSize: 22, lineHeight: 1, letterSpacing: "0.02em" }}
-          >
-            Carmeli&apos;s
-          </span>
-        </Link>
-
-        {/* Desktop nav — uppercase Hebrew letter-spaced */}
+    <header className="sticky top-0 z-50 bg-black/85 backdrop-blur-md border-b border-white/5">
+      {/* Centered desktop nav. No corner brand — the hero already wordmarks
+          the site at full size; a small logo in the corner just competes
+          with that and adds nothing. The "בית" link covers the
+          home-navigation case. */}
+      <div className="max-w-7xl mx-auto px-5 md:px-8 py-4 relative flex items-center justify-center min-h-[60px]">
+        {/* Desktop nav — center-aligned, generous letter-spacing */}
         <nav
-          className="hidden md:flex items-center gap-8"
+          className="hidden md:flex items-center gap-10"
           aria-label="ניווט ראשי"
         >
           {links.map((link) => {
@@ -58,20 +39,24 @@ export function Navbar() {
               >
                 <span
                   className={`font-label uppercase transition-colors ${
-                    isActive ? "text-gold-accent" : "text-white/85 hover:text-gold-accent"
+                    isActive
+                      ? "text-gold-accent"
+                      : "text-white/80 hover:text-gold-accent"
                   }`}
                   style={{
                     fontSize: 12,
-                    fontWeight: 700,
-                    letterSpacing: "0.28em",
+                    fontWeight: 600,
+                    letterSpacing: "0.36em",
                   }}
                 >
                   {link.label}
                 </span>
                 <span
                   aria-hidden
-                  className={`absolute right-0 left-0 -bottom-0.5 h-px bg-gold-accent origin-right transition-transform duration-300 ${
-                    isActive ? "scale-x-100" : "scale-x-0 group-hover:scale-x-100"
+                  className={`absolute right-0 left-0 -bottom-0.5 h-px bg-gold-accent origin-center transition-transform duration-300 ${
+                    isActive
+                      ? "scale-x-100"
+                      : "scale-x-0 group-hover:scale-x-100"
                   }`}
                 />
               </Link>
@@ -79,34 +64,34 @@ export function Navbar() {
           })}
         </nav>
 
-        {/* Mobile hamburger */}
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setMenuOpen(!menuOpen)}
-            aria-label={menuOpen ? "סגור תפריט" : "פתח תפריט"}
-            aria-expanded={menuOpen}
-            className="md:hidden flex flex-col justify-center items-center gap-1.5 w-11 h-11"
-          >
-            <motion.span
-              animate={{ rotate: menuOpen ? 45 : 0, y: menuOpen ? 6 : 0 }}
-              transition={{ duration: 0.2 }}
-              className="w-6 h-px bg-white"
-            />
-            <motion.span
-              animate={{ opacity: menuOpen ? 0 : 1 }}
-              transition={{ duration: 0.2 }}
-              className="w-6 h-px bg-white"
-            />
-            <motion.span
-              animate={{ rotate: menuOpen ? -45 : 0, y: menuOpen ? -6 : 0 }}
-              transition={{ duration: 0.2 }}
-              className="w-6 h-px bg-white"
-            />
-          </button>
-        </div>
+        {/* Mobile hamburger — absolutely positioned to the leading edge (right
+            in RTL). The header keeps the centered layout on desktop and the
+            hamburger doesn't pull the rest off-axis on mobile. */}
+        <button
+          onClick={() => setMenuOpen(!menuOpen)}
+          aria-label={menuOpen ? "סגור תפריט" : "פתח תפריט"}
+          aria-expanded={menuOpen}
+          className="md:hidden absolute right-5 top-1/2 -translate-y-1/2 flex flex-col justify-center items-center gap-1.5 w-11 h-11"
+        >
+          <motion.span
+            animate={{ rotate: menuOpen ? 45 : 0, y: menuOpen ? 6 : 0 }}
+            transition={{ duration: 0.2 }}
+            className="w-6 h-px bg-white"
+          />
+          <motion.span
+            animate={{ opacity: menuOpen ? 0 : 1 }}
+            transition={{ duration: 0.2 }}
+            className="w-6 h-px bg-white"
+          />
+          <motion.span
+            animate={{ rotate: menuOpen ? -45 : 0, y: menuOpen ? -6 : 0 }}
+            transition={{ duration: 0.2 }}
+            className="w-6 h-px bg-white"
+          />
+        </button>
       </div>
 
-      {/* Mobile nav */}
+      {/* Mobile nav drawer */}
       <AnimatePresence>
         {menuOpen && (
           <motion.nav
@@ -134,7 +119,7 @@ export function Navbar() {
                     style={{
                       fontSize: 13,
                       fontWeight: 700,
-                      letterSpacing: "0.28em",
+                      letterSpacing: "0.32em",
                     }}
                   >
                     {link.label}
