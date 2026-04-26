@@ -415,6 +415,36 @@ export default function ProductsAdminPage() {
   );
 }
 
+/**
+ * Encode a File as a raw base64 string (no `data:...;base64,` prefix) using
+ * FileReader. The browser handles the conversion natively without
+ * materialising the entire file as a JS array — works reliably for files
+ * well into the multi-MB range, where the older
+ * `Array.from(new Uint8Array(buffer)).map().join()` pattern silently
+ * blows up on some engines.
+ */
+function readAsBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result;
+      if (typeof result !== "string") {
+        reject(new Error("FileReader returned non-string"));
+        return;
+      }
+      // Result format: "data:<mime>;base64,<actualBase64>". Strip the prefix.
+      const commaIdx = result.indexOf(",");
+      if (commaIdx < 0) {
+        reject(new Error("FileReader result missing base64 separator"));
+        return;
+      }
+      resolve(result.slice(commaIdx + 1));
+    };
+    reader.onerror = () => reject(reader.error ?? new Error("FileReader failed"));
+    reader.readAsDataURL(file);
+  });
+}
+
 function ReorderButton({
   direction,
   disabled,
@@ -473,15 +503,36 @@ function ProductForm({
     const file = e.target.files?.[0];
     if (!file) return;
     setFormError(null);
+
+    // Sanity ceiling — the server bucket itself has no limit but the
+    // server action body cap is 300MB. Anything over a few MB is a sign
+    // the user picked a giant raw photo by mistake; ask them to compress.
+    const MAX_BYTES = 8 * 1024 * 1024; // 8MB — generous for product photos
+    if (file.size > MAX_BYTES) {
+      setFormError(
+        `הקובץ גדול מדי (${(file.size / 1024 / 1024).toFixed(1)}MB). בחר תמונה עד 8MB.`,
+      );
+      return;
+    }
+
     setUploading(true);
     try {
-      const buffer = await file.arrayBuffer();
-      const base64 = btoa(
-        Array.from(new Uint8Array(buffer))
-          .map((b) => String.fromCharCode(b))
-          .join(""),
-      );
+      // FileReader.readAsDataURL is the standard browser path — it handles
+      // multi-MB files without materialising 2M-element JS arrays in memory
+      // (the Array.from(...).map(...).join() pattern silently fails on
+      // larger images in some browsers, returning undefined from the
+      // server action and triggering the original "Cannot read properties
+      // of undefined (reading 'success')" crash).
+      const base64 = await readAsBase64(file);
       const r = await uploadProductImage(base64, file.name, file.type);
+
+      // Defensive: if for any reason the action returned undefined
+      // (network glitch, action serialization edge case), don't crash.
+      if (!r) {
+        setFormError("העלאה נכשלה — לא התקבלה תשובה מהשרת. נסה שוב.");
+        return;
+      }
+
       if (r.success && r.data) {
         setImageUrl(r.data.publicUrl);
       } else {
