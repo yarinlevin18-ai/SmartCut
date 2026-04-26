@@ -8,6 +8,7 @@ import { TodaySchedule } from "./TodaySchedule";
 import { BookingsCalendar } from "./BookingsCalendar";
 import { PendingRequests } from "./PendingRequests";
 import { AutoRefresh } from "./AutoRefresh";
+import { TrialBanner } from "./TrialBanner";
 import type { User } from "@supabase/supabase-js";
 
 export const dynamic = "force-dynamic";
@@ -66,6 +67,11 @@ export default async function AdminPage() {
 
   return (
     <div className="max-w-6xl">
+      {/* Trial-period notice — sits above the greeting so the barber can't
+          miss it. Dismissible per-browser; remove the component when the
+          trial ends and billing is active. */}
+      <TrialBanner />
+
       {/* Header */}
       <div className="mb-12">
         <p
