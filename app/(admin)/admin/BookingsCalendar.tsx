@@ -288,6 +288,15 @@ function BookingChip({ booking }: { booking: Booking }) {
       >
         {booking.full_name}
       </div>
+      {booking.phone && (
+        <div
+          className="font-body text-white/55 mt-0.5 truncate"
+          style={{ fontSize: 11, fontWeight: 300 }}
+          dir="ltr"
+        >
+          {booking.phone}
+        </div>
+      )}
       {booking.service?.name && (
         <div
           className="font-body text-white/40 mt-0.5 truncate"

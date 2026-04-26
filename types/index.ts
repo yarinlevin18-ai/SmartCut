@@ -89,6 +89,33 @@ export interface Booking {
   service?: Service;
 }
 
+/**
+ * Customer aggregate: rolled up from the bookings table by phone (the only
+ * stable identifier — names get typo'd, emails are sometimes blank).
+ *
+ * `bookings` is the full per-customer history sorted newest-first so the UI
+ * can render a "last visit" line and an expandable trail without a second
+ * fetch. `total_spend` sums prices on confirmed/completed bookings only —
+ * cancelled/denied/no_show don't count revenue.
+ */
+export interface Customer {
+  /** Stable id derived from phone (digits-only, leading +). */
+  phone_key: string;
+  /** Latest name we have for this phone — most recent booking wins. */
+  name: string;
+  phone: string;
+  email: string | null;
+  total_visits: number;
+  /** Bookings whose status counts toward "they actually came in." */
+  completed_visits: number;
+  /** Newest slot_start (or created_at if no slot) across their bookings. */
+  last_visit: string | null;
+  total_spend: number;
+  /** Distinct service names across all their bookings. */
+  services: string[];
+  bookings: Booking[];
+}
+
 export interface BookingInput {
   full_name: string;
   phone: string;

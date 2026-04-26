@@ -5,6 +5,13 @@ import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { createClientBrowser } from "@/lib/supabase-browser";
 
+// Carmeli's Studio Wix site ID — extracted from the live dashboard URL.
+// Used for deep-links into Wix that land on the right page instead of the
+// generic sites picker (which adds friction every time the barber wants to
+// issue a receipt). When this code goes multi-tenant, move to env per tenant.
+const WIX_SITE_ID = "b4b5a3f7-5928-4d90-8152-8e6c034e1b46";
+const WIX_INVOICES_URL = `https://manage.wix.com/dashboard/${WIX_SITE_ID}/wix-invoices/invoices`;
+
 const NAV_ITEMS = [
   { href: "/admin", label: "סקירה", en: "Dashboard" },
   { href: "/admin/services", label: "שירותים", en: "Services" },
@@ -13,6 +20,7 @@ const NAV_ITEMS = [
   { href: "/admin/gallery", label: "גלריה", en: "Gallery" },
   { href: "/admin/availability", label: "זמינות", en: "Availability" },
   { href: "/admin/bookings", label: "תורים", en: "Bookings" },
+  { href: "/admin/customers", label: "לקוחות", en: "Customers" },
   { href: "/admin/notifications", label: "התראות", en: "Notifications" },
 ];
 
@@ -158,7 +166,7 @@ export function AdminSidebar() {
         </Link>
 
         <a
-          href="https://manage.wix.com"
+          href={WIX_INVOICES_URL}
           target="_blank"
           rel="noopener noreferrer"
           className="block group"

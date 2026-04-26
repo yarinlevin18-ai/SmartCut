@@ -115,9 +115,13 @@ export default function BookingsPage() {
     } catch {
       /* ignore — popup might be blocked, link still opens */
     }
-    // Wix's /dashboard route 400s without a site ID. Sending to the bare
-    // host lands on the sites picker — works for any account.
-    window.open("https://manage.wix.com", "_blank", "noopener,noreferrer");
+    // Open a fresh Wix invoice form for the studio's site so the barber can
+    // paste the customer details (already on the clipboard) into the right
+    // place. WIX_SITE_ID is the Carmeli's Studio site — when this code goes
+    // multi-tenant, move to env per tenant.
+    const WIX_SITE_ID = "b4b5a3f7-5928-4d90-8152-8e6c034e1b46";
+    const newInvoiceUrl = `https://manage.wix.com/dashboard/${WIX_SITE_ID}/wix-invoices/invoice/new?interaction=create-from-invoice_list`;
+    window.open(newInvoiceUrl, "_blank", "noopener,noreferrer");
   };
 
   // A booking is "manageable" by the customer iff status is confirmed AND

@@ -685,9 +685,14 @@ export async function getBookings(): Promise<ServerActionResult<Booking[]>> {
   try {
     await requireAdmin();
     const supabase = await createClient();
+    // Alias the embedded service to `service` (singular) so it matches the
+    // Booking type. PostgREST's default key is the table name `services`, but
+    // every consumer in the app reads `booking.service?.name` — without the
+    // alias the field is silently undefined and the service line never
+    // renders in the calendar chip / pending requests / today schedule.
     const { data, error } = await supabase
       .from("bookings")
-      .select("*, services(*)")
+      .select("*, service:services(*)")
       .order("created_at", { ascending: false });
 
     if (error) throw error;
@@ -702,6 +707,112 @@ export async function getBookings(): Promise<ServerActionResult<Booking[]>> {
     return {
       success: false,
       error: errorMessage,
+    };
+  }
+}
+
+/**
+ * Aggregate the bookings table into per-customer rows, dedup'd by phone.
+ *
+ * Phone is the only stable identifier — names get typo'd and emails are
+ * frequently blank. We normalise to digits-only with a leading '+' (where
+ * present) so "052-455-0069", "0524550069", and "+972-52-455-00-69" all
+ * collapse to the same person.
+ *
+ * Cancelled and denied bookings still count toward `total_visits` (the
+ * customer DID try to book) but NOT toward `completed_visits` or
+ * `total_spend` — those measure actual revenue / chair time.
+ *
+ * Sorted by most-recent activity descending so the customers a barber is
+ * most likely to look up — recent visitors — surface to the top.
+ */
+export async function getCustomers(): Promise<ServerActionResult<import("@/types").Customer[]>> {
+  try {
+    await requireAdmin();
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from("bookings")
+      .select("*, service:services(*)")
+      .order("created_at", { ascending: false });
+    if (error) throw error;
+
+    const rows = (data ?? []) as Booking[];
+
+    // Normalise phone: strip everything except digits and a leading '+'.
+    // Empty / unparseable phones get bucketed under "(no phone)" so they
+    // don't all collide as the empty-string key.
+    const phoneKey = (raw: string | null | undefined): string => {
+      const s = (raw ?? "").trim();
+      if (!s) return "(no-phone)";
+      const plus = s.startsWith("+") ? "+" : "";
+      const digits = s.replace(/\D/g, "");
+      if (!digits) return "(no-phone)";
+      return `${plus}${digits}`;
+    };
+
+    type Customer = import("@/types").Customer;
+    const map = new Map<string, Customer>();
+
+    for (const b of rows) {
+      const key = phoneKey(b.phone);
+      const existing = map.get(key);
+      const slotOrCreated = b.slot_start ?? b.created_at;
+      const isRevenueBooking =
+        b.status === "confirmed" || b.status === "completed";
+      const price = isRevenueBooking
+        ? Number((b.service as { price?: number } | undefined)?.price ?? 0) || 0
+        : 0;
+
+      if (!existing) {
+        map.set(key, {
+          phone_key: key,
+          // First booking we encounter is the newest (rows sorted DESC), so
+          // it's the most-recent name and email — exactly what the UI wants.
+          name: (b.full_name || "").trim() || "—",
+          phone: b.phone || "",
+          email: b.email ?? null,
+          total_visits: 1,
+          completed_visits: b.status === "completed" ? 1 : 0,
+          last_visit: slotOrCreated,
+          total_spend: price,
+          services: b.service?.name ? [b.service.name] : [],
+          bookings: [b],
+        });
+        continue;
+      }
+
+      existing.total_visits += 1;
+      if (b.status === "completed") existing.completed_visits += 1;
+      existing.total_spend += price;
+      // Pull email forward if we got one on a later booking and didn't have
+      // one before — partial info merges instead of stomping.
+      if (!existing.email && b.email) existing.email = b.email;
+      if (b.service?.name && !existing.services.includes(b.service.name)) {
+        existing.services.push(b.service.name);
+      }
+      // last_visit is the max of slot_start (preferred) or created_at.
+      if (
+        slotOrCreated &&
+        (!existing.last_visit ||
+          new Date(slotOrCreated).getTime() >
+            new Date(existing.last_visit).getTime())
+      ) {
+        existing.last_visit = slotOrCreated;
+      }
+      existing.bookings.push(b);
+    }
+
+    const customers = Array.from(map.values()).sort((a, b) => {
+      const at = a.last_visit ? new Date(a.last_visit).getTime() : 0;
+      const bt = b.last_visit ? new Date(b.last_visit).getTime() : 0;
+      return bt - at;
+    });
+
+    return { success: true, data: customers };
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : "Failed to load customers",
     };
   }
 }
