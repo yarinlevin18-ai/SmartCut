@@ -37,19 +37,18 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   metadataBase: new URL("https://carmelis-studio.vercel.app"),
   title: {
-    default: "קרמליס סטודיו | גילוח וטיפוח בתל אביב",
+    default: "קרמליס סטודיו | גילוח וטיפוח לגבר",
     template: "%s | קרמליס סטודיו",
   },
   description:
-    "סטודיו גברים פרימיום בתל אביב. גילוח קלאסי, עיצוב זקן ושפם, וטיפול שיער. קבע תור עכשיו.",
+    "סטודיו גברים פרימיום. גילוח קלאסי, עיצוב זקן ושפם, וטיפול שיער. קבע תור עכשיו.",
   keywords: [
     "קרמליס סטודיו",
-    "גילוח תל אביב",
     "מספרה גברים",
     "עיצוב זקן",
     "גילוח קלאסי",
     "טיפול שיער",
-    "barbershop tel aviv",
+    "barbershop",
   ],
   authors: [{ name: "קרמליס סטודיו" }],
   creator: "קרמליס סטודיו",
@@ -58,9 +57,9 @@ export const metadata: Metadata = {
     locale: "he_IL",
     url: "https://carmelis-studio.vercel.app",
     siteName: "קרמליס סטודיו",
-    title: "קרמליס סטודיו | גילוח וטיפוח בתל אביב",
+    title: "קרמליס סטודיו | גילוח וטיפוח לגבר",
     description:
-      "סטודיו גברים פרימיום בתל אביב. גילוח קלאסי, עיצוב זקן ושפם, וטיפול שיער. קבע תור עכשיו.",
+      "סטודיו גברים פרימיום. גילוח קלאסי, עיצוב זקן ושפם, וטיפול שיער. קבע תור עכשיו.",
     images: [
       {
         url: "https://static.wixstatic.com/media/3d7d7e_c3c9c7388d8e45c9aa202d3e9a91c3b4~mv2.png",
@@ -73,9 +72,9 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary",
-    title: "קרמליס סטודיו | גילוח וטיפוח בתל אביב",
+    title: "קרמליס סטודיו | גילוח וטיפוח לגבר",
     description:
-      "סטודיו גברים פרימיום בתל אביב. גילוח קלאסי, עיצוב זקן ושפם, וטיפול שיער.",
+      "סטודיו גברים פרימיום. גילוח קלאסי, עיצוב זקן ושפם, וטיפול שיער.",
     images: [
       "https://static.wixstatic.com/media/3d7d7e_c3c9c7388d8e45c9aa202d3e9a91c3b4~mv2.png",
     ],
@@ -117,21 +116,19 @@ export default function RootLayout({
     "@id": "https://carmelis-studio.vercel.app/#business",
     name: "קרמליס סטודיו",
     description:
-      "סטודיו גברים פרימיום בתל אביב. גילוח קלאסי, עיצוב זקן ושפם, וטיפול שיער.",
+      "סטודיו גברים פרימיום. גילוח קלאסי, עיצוב זקן ושפם, וטיפול שיער.",
     url: "https://carmelis-studio.vercel.app",
     image: "https://static.wixstatic.com/media/3d7d7e_c3c9c7388d8e45c9aa202d3e9a91c3b4~mv2.png",
     telephone: "+972-52-455-0069",
     priceRange: "₪₪",
+    // Address + geo coords intentionally omitted until the real shop
+    // location is provided. The previous Tel Aviv values were placeholder
+    // and would mislead Google Business / Maps if left in. The barber
+    // can update the visible address via /admin/content; the JSON-LD
+    // address can be wired up to the same source in a follow-up.
     address: {
       "@type": "PostalAddress",
-      streetAddress: "רחוב קרמליס 42",
-      addressLocality: "תל אביב",
       addressCountry: "IL",
-    },
-    geo: {
-      "@type": "GeoCoordinates",
-      latitude: 32.0853,
-      longitude: 34.7818,
     },
     openingHoursSpecification: [
       {

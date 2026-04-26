@@ -21,6 +21,29 @@ h1, h2, h3, h4, h5, h6 {
   font-weight: 700;
 }
 
+/* Polished-gold text gradient — used for hero/section H1s that should
+   read as a luxury wordmark rather than flat gold text. Goes from a
+   bright top-highlight through the brand gold-accent down to a deep
+   shadow tone, mimicking how light catches polished metal. Apply by
+   adding `gold-shine` on the heading element (drop any text-color class).
+   Keeps full SEO weight (it's still text, just gradient-filled). */
+.gold-shine {
+  background: linear-gradient(
+    180deg,
+    #f5dc8a 0%,
+    #e2c97e 28%,
+    #c9a84c 58%,
+    #a8893a 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  /* Subtle warm drop-shadow keeps the letterforms readable against
+     the radial-gold backgrounds without muddying the gradient. */
+  filter: drop-shadow(0 1px 0 rgba(0, 0, 0, 0.45));
+}
+
 /* Accent color utilities */
 .accent-gold {
   color: #c9a84c;

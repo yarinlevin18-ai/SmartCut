@@ -12,18 +12,21 @@ export function CookiePreferencesButton({
   variant = "outlined",
 }: CookiePreferencesButtonProps) {
   if (variant === "link") {
+    // Match the surrounding footer-link style (font-body, fontSize 13,
+    // fontWeight 300) so this control reads as one of the legal links
+    // rather than a misplaced label-cap chip.
     return (
       <button
         type="button"
         onClick={openCookiePreferences}
-        className="font-label uppercase text-white/60 hover:text-gold-accent transition-colors"
+        className="font-body text-white/70 hover:text-gold-accent transition-colors text-start"
         style={{
-          fontSize: 10,
-          fontWeight: 500,
-          letterSpacing: "0.28em",
+          fontSize: 13,
+          fontWeight: 300,
           background: "transparent",
           padding: 0,
           border: 0,
+          cursor: "pointer",
         }}
       >
         {label}

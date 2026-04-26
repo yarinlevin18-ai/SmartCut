@@ -69,7 +69,7 @@ export function ServicesPreviewClient({ services }: ServicesPreviewClientProps) 
             Menu · מחירון
           </p>
           <h2
-            className="font-display text-white"
+            className="font-display gold-shine"
             style={{
               fontSize: "clamp(40px, 6vw, 72px)",
               lineHeight: 1,

@@ -54,7 +54,7 @@ export function CTASection() {
         >
           הגיע הזמן
           <br />
-          <span className="italic text-gold-accent">להשקיע בעצמך</span>
+          <span className="italic gold-shine">להשקיע בעצמך</span>
         </h2>
 
         <div className="flex items-center justify-center gap-3 mt-8 mb-10">

@@ -49,7 +49,7 @@ export function ProductsPageClient({ products }: ProductsPageClientProps) {
             Products · המוצרים
           </p>
           <h1
-            className="font-display text-white mb-4"
+            className="font-display gold-shine mb-4"
             style={{ fontSize: "clamp(40px, 6vw, 64px)", lineHeight: 1.05 }}
           >
             הקולקציה שלנו

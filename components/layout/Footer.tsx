@@ -135,20 +135,28 @@ export function Footer() {
                   >
                     {address}
                   </span>
-                  <a
-                    href={wazeUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="font-label uppercase text-gold-accent hover:text-gold-light transition-colors inline-flex items-center gap-1.5 self-center md:self-start"
-                    style={{
-                      fontSize: 10,
-                      fontWeight: 600,
-                      letterSpacing: "0.28em",
-                    }}
-                  >
-                    <span aria-hidden style={{ fontSize: 11 }}>↗</span>
-                    נווט ב-Waze
-                  </a>
+                  {/* Wrap in a div so the inline-flex link inherits the
+                      same text-align as the address text above (centered on
+                      mobile, left in desktop RTL → leading edge of the
+                      column). The previous `self-center md:self-start` put
+                      it at the trailing edge in RTL, misaligned with the
+                      address. */}
+                  <div className="text-center md:text-left">
+                    <a
+                      href={wazeUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-label uppercase text-gold-accent hover:text-gold-light transition-colors inline-flex items-center gap-1.5"
+                      style={{
+                        fontSize: 10,
+                        fontWeight: 600,
+                        letterSpacing: "0.28em",
+                      }}
+                    >
+                      <span aria-hidden style={{ fontSize: 11 }}>↗</span>
+                      נווט ב-Waze
+                    </a>
+                  </div>
                 </div>
               )}
               <a

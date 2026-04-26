@@ -122,8 +122,8 @@ export default function PrivacyPage() {
 
         <h2>יצירת קשר</h2>
         <p>
-          לשאלות בנושא פרטיות, ניתן לפנות בכתב לכתובת: קרמליס סטודיו, תל אביב,
-          או בדוא&quot;ל{" "}
+          לשאלות בנושא פרטיות, ניתן לפנות בכתב לכתובת: קרמליס סטודיו, או
+          בדוא&quot;ל{" "}
           <a href="mailto:privacy@carmelis-studio.com">
             privacy@carmelis-studio.com
           </a>
