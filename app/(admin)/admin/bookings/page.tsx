@@ -47,7 +47,18 @@ export default function BookingsPage() {
   const [copiedWix, setCopiedWix] = useState<string | null>(null);
   const [denyTarget, setDenyTarget] = useState<DenyModalState>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [showArchived, setShowArchived] = useState(false);
   const [, startTransition] = useTransition();
+
+  // Hide cancelled/denied by default — the admin doesn't need them in the
+  // day-to-day workflow but we keep them in the DB for audit and let the
+  // toggle bring them back into view when needed.
+  const isArchived = (b: Booking): boolean =>
+    b.status === "cancelled" || b.status === "denied";
+  const visibleBookings = showArchived
+    ? bookings
+    : bookings.filter((b) => !isArchived(b));
+  const archivedCount = bookings.filter(isArchived).length;
 
   const manageUrlFor = (token: string): string => {
     const origin =
@@ -104,7 +115,9 @@ export default function BookingsPage() {
     } catch {
       /* ignore — popup might be blocked, link still opens */
     }
-    window.open("https://manage.wix.com/dashboard", "_blank", "noopener,noreferrer");
+    // Wix's /dashboard route 400s without a site ID. Sending to the bare
+    // host lands on the sites picker — works for any account.
+    window.open("https://manage.wix.com", "_blank", "noopener,noreferrer");
   };
 
   // A booking is "manageable" by the customer iff status is confirmed AND
@@ -197,30 +210,53 @@ export default function BookingsPage() {
 
   return (
     <div className="max-w-6xl">
+      {/* Bookings the admin actually needs to act on, day-to-day. Cancelled
+          and denied stay in the DB for audit but clutter the live list — hide
+          them by default and offer a toggle to surface them when needed. */}
       {/* Header */}
-      <div className="mb-10">
-        <p
-          className="font-label uppercase text-gold-accent mb-3"
-          style={{
-            fontSize: 11,
-            fontWeight: 600,
-            letterSpacing: "0.36em",
-          }}
-        >
-          Bookings · תורים
-        </p>
-        <h1
-          className="font-display text-white mb-2"
-          style={{ fontSize: "clamp(32px, 4.5vw, 48px)", lineHeight: 1.05 }}
-        >
-          בקשות תור
-        </h1>
-        <p
-          className="font-body text-white/55"
-          style={{ fontSize: 14, fontWeight: 300 }}
-        >
-          {bookings.length} בקשות שהתקבלו
-        </p>
+      <div className="mb-10 flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <p
+            className="font-label uppercase text-gold-accent mb-3"
+            style={{
+              fontSize: 11,
+              fontWeight: 600,
+              letterSpacing: "0.36em",
+            }}
+          >
+            Bookings · תורים
+          </p>
+          <h1
+            className="font-display text-white mb-2"
+            style={{ fontSize: "clamp(32px, 4.5vw, 48px)", lineHeight: 1.05 }}
+          >
+            בקשות תור
+          </h1>
+          <p
+            className="font-body text-white/55"
+            style={{ fontSize: 14, fontWeight: 300 }}
+          >
+            {visibleBookings.length} פעילות · {archivedCount} בוטלו/נדחו
+          </p>
+        </div>
+        {archivedCount > 0 && (
+          <button
+            type="button"
+            onClick={() => setShowArchived((v) => !v)}
+            className="font-label uppercase transition-colors hover:bg-white/5"
+            style={{
+              border: "1px solid rgba(255,255,255,0.18)",
+              color: showArchived ? "#c9a84c" : "rgba(255,255,255,0.7)",
+              background: "transparent",
+              fontSize: 10,
+              fontWeight: 600,
+              padding: "10px 16px",
+              letterSpacing: "0.24em",
+            }}
+          >
+            {showArchived ? "הסתר בוטלו/נדחו" : "הצג בוטלו/נדחו"}
+          </button>
+        )}
       </div>
 
       {loading ? (
@@ -230,7 +266,7 @@ export default function BookingsPage() {
         >
           טוען…
         </div>
-      ) : bookings.length === 0 ? (
+      ) : visibleBookings.length === 0 ? (
         <div
           className="p-12 text-center"
           style={{
@@ -253,7 +289,7 @@ export default function BookingsPage() {
           }}
         >
           <ul className="divide-y divide-white/5">
-            {bookings.map((booking) => {
+            {visibleBookings.map((booking) => {
               const isExpanded = expanded === booking.id;
               return (
                 <li key={booking.id}>

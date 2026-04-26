@@ -158,7 +158,7 @@ export function AdminSidebar() {
         </Link>
 
         <a
-          href="https://manage.wix.com/dashboard"
+          href="https://manage.wix.com"
           target="_blank"
           rel="noopener noreferrer"
           className="block group"
