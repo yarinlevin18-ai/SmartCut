@@ -33,7 +33,7 @@ export default function TermsPage() {
           <strong>&ldquo;המשתמש&rdquo;</strong> — כל אדם הגולש באתר או מזמין
           דרכו שירות.{" "}
           <strong>&ldquo;האתר&rdquo;</strong> — האתר בכתובת{" "}
-          <a href="https://carmelis.co.il">carmelis.co.il</a>.
+          <a href="https://smart-cut-gamma.vercel.app">smart-cut-gamma.vercel.app</a>.
         </p>
 
         <h2>הזמנת תור</h2>

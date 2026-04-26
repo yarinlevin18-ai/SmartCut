@@ -9,6 +9,6 @@ export default function robots(): MetadataRoute.Robots {
         disallow: ["/admin", "/admin/"],
       },
     ],
-    sitemap: "https://carmelis.co.il/sitemap.xml",
+    sitemap: "https://smart-cut-gamma.vercel.app/sitemap.xml",
   };
 }
