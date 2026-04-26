@@ -351,50 +351,57 @@ export default function AvailabilityPage() {
           {rows.map((row, idx) => {
             const error = rowErrors[idx];
             return (
-              <li key={row.weekday} className="px-5 md:px-7 py-5">
-                <div className="flex items-start gap-5 flex-wrap md:flex-nowrap">
-                  <div className="shrink-0 w-32">
-                    <div
-                      className="font-display text-white"
-                      style={{ fontSize: 18 }}
-                    >
-                      {WEEKDAY_LABELS[row.weekday]}
+              <li key={row.weekday} className="px-4 md:px-7 py-5">
+                {/* Mobile: vertical stack — day header on its own row, then
+                    the inputs as a single column so the labels (with their
+                    heavy letter-spacing) get the full container width and
+                    don't visually merge into each other. Desktop keeps the
+                    horizontal flow. */}
+                <div className="flex flex-col md:flex-row md:items-start gap-3 md:gap-5">
+                  {/* Day header + closed-toggle on one line on mobile */}
+                  <div className="flex items-center justify-between gap-3 md:flex-col md:items-start md:w-32 md:shrink-0">
+                    <div>
+                      <div
+                        className="font-display text-white"
+                        style={{ fontSize: 18 }}
+                      >
+                        {WEEKDAY_LABELS[row.weekday]}
+                      </div>
+                      <div
+                        className={labelClass}
+                        style={{
+                          fontSize: 9,
+                          fontWeight: 600,
+                          letterSpacing: "0.32em",
+                        }}
+                        dir="ltr"
+                      >
+                        {WEEKDAY_EN[row.weekday]}
+                      </div>
                     </div>
-                    <div
-                      className={labelClass}
-                      style={{
-                        fontSize: 9,
-                        fontWeight: 600,
-                        letterSpacing: "0.32em",
-                      }}
-                      dir="ltr"
+
+                    <label
+                      className="flex items-center gap-2 shrink-0 cursor-pointer select-none md:mt-1"
                     >
-                      {WEEKDAY_EN[row.weekday]}
-                    </div>
+                      <input
+                        type="checkbox"
+                        checked={row.is_closed}
+                        onChange={(e) =>
+                          updateRow(row.weekday, { is_closed: e.target.checked })
+                        }
+                        className="accent-gold-accent w-4 h-4"
+                      />
+                      <span
+                        className="font-body text-white/80"
+                        style={{ fontSize: 13 }}
+                      >
+                        סגור
+                      </span>
+                    </label>
                   </div>
 
-                  <label
-                    className="flex items-center gap-2 shrink-0 cursor-pointer select-none mt-1"
-                    style={{ minWidth: 100 }}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={row.is_closed}
-                      onChange={(e) =>
-                        updateRow(row.weekday, { is_closed: e.target.checked })
-                      }
-                      className="accent-gold-accent w-4 h-4"
-                    />
-                    <span
-                      className="font-body text-white/80"
-                      style={{ fontSize: 13 }}
-                    >
-                      סגור
-                    </span>
-                  </label>
-
                   {!row.is_closed && (
-                    <div className="flex-1 min-w-0 grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <div className="flex-1 min-w-0 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
                       <div className="flex flex-col gap-1">
                         <span
                           className={labelClass}

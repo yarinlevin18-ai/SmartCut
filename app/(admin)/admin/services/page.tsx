@@ -136,46 +136,63 @@ export default function ServicesPage() {
             {services.map((service) => (
               <li
                 key={service.id}
-                className="p-6 md:p-7 flex items-center gap-5 hover:bg-white/[0.02] transition-colors"
+                className="p-4 md:p-7 hover:bg-white/[0.02] transition-colors"
               >
-                {/* Order badge */}
-                <div
-                  className="shrink-0 w-10 h-10 flex items-center justify-center font-display text-gold-accent"
-                  style={{
-                    border: "1px solid rgba(201,168,76,0.25)",
-                    fontSize: 15,
-                  }}
-                >
-                  {service.display_order}
-                </div>
-
-                {/* Name + description */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-baseline gap-2 flex-wrap">
-                    <span
-                      className="font-display text-white"
-                      style={{ fontSize: 20, lineHeight: 1.2 }}
+                {/* Mobile: stacked. Desktop: one horizontal row. The previous
+                    single-row layout collapsed Hebrew descriptions into one
+                    char per line on phones (~50px columns). */}
+                <div className="flex flex-col md:flex-row md:items-center gap-3 md:gap-5">
+                  {/* Header row: badge + name + price always grouped together */}
+                  <div className="flex items-center gap-3 md:gap-5 md:flex-1 min-w-0">
+                    <div
+                      className="shrink-0 w-10 h-10 flex items-center justify-center font-display text-gold-accent"
+                      style={{
+                        border: "1px solid rgba(201,168,76,0.25)",
+                        fontSize: 15,
+                      }}
                     >
-                      {service.name}
-                    </span>
-                    {service.duration_minutes ? (
-                      <span
-                        className="font-label uppercase text-white/40"
-                        style={{
-                          fontSize: 10,
-                          fontWeight: 600,
-                          letterSpacing: "0.28em",
-                        }}
-                      >
-                        · {service.duration_minutes} דק&apos;
-                      </span>
-                    ) : null}
+                      {service.display_order}
+                    </div>
+
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-baseline gap-2 flex-wrap">
+                        <span
+                          className="font-display text-white truncate"
+                          style={{ fontSize: 18, lineHeight: 1.2 }}
+                        >
+                          {service.name}
+                        </span>
+                        {service.duration_minutes ? (
+                          <span
+                            className="font-label uppercase text-white/40 shrink-0"
+                            style={{
+                              fontSize: 10,
+                              fontWeight: 600,
+                              letterSpacing: "0.2em",
+                            }}
+                          >
+                            {service.duration_minutes} דק&apos;
+                          </span>
+                        ) : null}
+                      </div>
+                    </div>
+
+                    <div
+                      className="shrink-0 font-display text-gold-accent"
+                      style={{ fontSize: 20 }}
+                    >
+                      ₪{service.price}
+                    </div>
                   </div>
+
+                  {/* Description on its own line on mobile (full width); on
+                      desktop it's still under the name in the flex-1 column,
+                      so we hide this duplicate. */}
                   {service.description && (
                     <p
-                      className="font-body text-white/55 mt-2 line-clamp-2"
+                      className="font-body text-white/55 line-clamp-2 md:hidden"
                       style={{
-                        fontSize: 13,
+                        fontSize: 12,
                         fontWeight: 300,
                         lineHeight: 1.6,
                       }}
@@ -183,56 +200,64 @@ export default function ServicesPage() {
                       {service.description}
                     </p>
                   )}
+
+                  {/* Actions: full-width row on mobile (each button equal share),
+                      compact group on desktop. */}
+                  <div className="grid grid-cols-2 gap-2 md:flex md:items-center md:gap-2 md:shrink-0">
+                    <button
+                      onClick={() => {
+                        setEditingService(service);
+                        setShowModal(true);
+                      }}
+                      aria-label="ערוך"
+                      className="font-label uppercase transition-all hover:bg-gold-accent hover:text-black"
+                      style={{
+                        border: "1px solid rgba(201,168,76,0.35)",
+                        color: "#c9a84c",
+                        background: "transparent",
+                        fontSize: 10,
+                        fontWeight: 600,
+                        padding: "10px 16px",
+                        borderRadius: 0,
+                        letterSpacing: "0.28em",
+                      }}
+                    >
+                      ערוך
+                    </button>
+                    <button
+                      onClick={() => setConfirmDelete(service.id)}
+                      aria-label="מחק"
+                      className="font-label uppercase transition-all hover:bg-red-500/10 hover:text-red-300"
+                      style={{
+                        border: "1px solid rgba(239,68,68,0.3)",
+                        color: "rgba(239,68,68,0.85)",
+                        background: "transparent",
+                        fontSize: 10,
+                        fontWeight: 600,
+                        padding: "10px 16px",
+                        borderRadius: 0,
+                        letterSpacing: "0.28em",
+                      }}
+                    >
+                      מחק
+                    </button>
+                  </div>
                 </div>
 
-                {/* Price */}
-                <div
-                  className="shrink-0 font-display text-gold-accent"
-                  style={{ fontSize: 22 }}
-                >
-                  ₪{service.price}
-                </div>
-
-                {/* Actions */}
-                <div className="shrink-0 flex items-center gap-2">
-                  <button
-                    onClick={() => {
-                      setEditingService(service);
-                      setShowModal(true);
-                    }}
-                    aria-label="ערוך"
-                    className="font-label uppercase transition-all hover:bg-gold-accent hover:text-black"
+                {/* Desktop-only description (so it sits under the name within
+                    the flex-1 column rather than spanning the full row). */}
+                {service.description && (
+                  <p
+                    className="hidden md:block font-body text-white/55 mt-2 line-clamp-2 ms-[60px]"
                     style={{
-                      border: "1px solid rgba(201,168,76,0.35)",
-                      color: "#c9a84c",
-                      background: "transparent",
-                      fontSize: 10,
-                      fontWeight: 600,
-                      padding: "8px 16px",
-                      borderRadius: 0,
-                      letterSpacing: "0.28em",
+                      fontSize: 13,
+                      fontWeight: 300,
+                      lineHeight: 1.6,
                     }}
                   >
-                    ערוך
-                  </button>
-                  <button
-                    onClick={() => setConfirmDelete(service.id)}
-                    aria-label="מחק"
-                    className="font-label uppercase transition-all hover:bg-red-500/10 hover:text-red-300"
-                    style={{
-                      border: "1px solid rgba(239,68,68,0.3)",
-                      color: "rgba(239,68,68,0.85)",
-                      background: "transparent",
-                      fontSize: 10,
-                      fontWeight: 600,
-                      padding: "8px 16px",
-                      borderRadius: 0,
-                      letterSpacing: "0.28em",
-                    }}
-                  >
-                    מחק
-                  </button>
-                </div>
+                    {service.description}
+                  </p>
+                )}
               </li>
             ))}
           </ul>
