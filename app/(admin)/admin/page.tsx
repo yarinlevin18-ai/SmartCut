@@ -9,6 +9,7 @@ import { BookingsCalendar } from "./BookingsCalendar";
 import { PendingRequests } from "./PendingRequests";
 import { AutoRefresh } from "./AutoRefresh";
 import { TrialBanner } from "./TrialBanner";
+import { DomainBanner } from "./DomainBanner";
 import type { User } from "@supabase/supabase-js";
 
 export const dynamic = "force-dynamic";
@@ -71,6 +72,10 @@ export default async function AdminPage() {
           miss it. Dismissible per-browser; remove the component when the
           trial ends and billing is active. */}
       <TrialBanner />
+
+      {/* Live URL + upgrade-to-real-domain notice. Dismissible. Remove
+          the component when a real domain is wired up. */}
+      <DomainBanner />
 
       {/* Header */}
       <div className="mb-12">

@@ -64,7 +64,7 @@ export default function BookingsPage() {
     const origin =
       typeof window !== "undefined"
         ? window.location.origin
-        : "https://smart-cut-gamma.vercel.app";
+        : "https://carmelis-studio.vercel.app";
     return `${origin}/booking/manage/${token}`;
   };
 
